@@ -24,8 +24,8 @@ conflicts=('kali-odroidc1')
 # config for Odroid C1
 ARCHITECTURE="armhf"
 PATCH_MAC80211="kali-wifi-injection-3.18.patch"
-CONFIG_KERNEL="rpi2-3.19.config"
-PATCH_CONFIG_KERNEL="rpi-kernel-config-3.19.patch"
+CONFIG_KERNEL="odroidc1-3.10.config"
+PATCH_CONFIG_KERNEL="odroidc1-kernel-config.patch"
 
 
 # Package installations for various sections.
@@ -60,8 +60,8 @@ source=(
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" #http://releases.linaro.org/14.09/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz
         "firmware-linux-git::git+https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
         "kali-wifi-injection-3.18.patch" #"mac80211.patch::https://raw.github.com/offensive-security/kali-arm-build-scripts/master/patches/kali-wifi-injection-3.12.patch"
-        #"rpi2-3.19.config"
-        #"rpi-kernel-config.patch"
+        "odroidc1-3.10.config"
+        "odroidc1-kernel-config.patch"
 
         # u-boot
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
@@ -74,9 +74,9 @@ md5sums=(
          'd7805745171f63c2556083e20abbd8eb' # gcc for kernel
          'SKIP'
          'SKIP'
-         'SKIP'
-         'SKIP'
-         'SKIP'
+         '37b89f74e3f9f6c20295da564ece5b8f'
+         'e54725fa965b4b8531563f40a420a40c'
+         'a658e75a84cf9fe0874baad602049703'
          '12d6e8a0cbd2d8e130cc8f55389a95c3' # gcc for uboot
          'SKIP'
          )
@@ -86,9 +86,9 @@ sha1sums=(
          'b6d5f985ac254b1d60d8f01459f64d248adb7838'
          'SKIP'
          'SKIP'
-         'SKIP'
-         'SKIP'
-         'SKIP'
+         '48ce0c7886128fb068b70b5692b60a6c5aec0e96'
+         '95cb733d04afb2960beb7c4f5090ca47b943c8d0'
+         '125003dfdbef989b8e2cf1bc19cdac45df8742e1'
          '8069f484cfd5a7ea02d5bb74b56ae6c99e478d13'
          'SKIP'
          )
@@ -98,47 +98,6 @@ pkgver() {
     local ver="$(git show | grep commit | awk '{print $2}'  )"
     #printf "r%s" "${ver//[[:alpha:]]}"
     echo ${ver:0:7}
-}
-
-prepare_hardkernel_uboot () {
-    echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
-    mkdir -p ${DN_TOOLCHAIN_UBOOT}
-    tar xvf ${srcdir}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
-
-    echo "[DBG] cd ${srcdir}/uboot-hardkernel-git ..."
-    cd "${srcdir}/uboot-hardkernel-git"
-    git checkout odroidc-v2011.03
-    if [ ! "$?" = "0" ]; then
-        echo "Error in git"
-        exit 1
-    fi
-}
-
-build_hardkernel_uboot () {
-    cd ${srcdir}/uboot-hardkernel-git
-    export PATH=${DN_TOOLCHAIN_UBOOT}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux/bin/:$PATH
-    make odroidc_config
-    make
-}
-
-install_hardkernel_uboot () {
-    PARAM_FN_IMAGE=$1
-    shift
-
-    cd ${srcdir}/uboot-hardkernel-git
-
-if [ 0 = 1 ]; then
-    BL1=bl1.bin.hardkernel
-    UBOOT=u-boot.bin
-    # install BL1/MBR
-    sudo dd if=$BL1   of=${PARAM_FN_IMAGE} bs=1 count=442
-    sudo dd if=$BL1   of=${PARAM_FN_IMAGE} bs=512 skip=1 seek=1
-    # install u-boot:
-    sudo dd if=$UBOOT of=${PARAM_FN_IMAGE} bs=512 seek=64
-else
-    cd sd_fuse
-    sh sd_fusing.sh ${PARAM_FN_IMAGE}
-fi
 }
 
 
@@ -479,7 +438,7 @@ EOF
     fi
 }
 
-prepare() {
+my_setevn() {
     # setup environments
     MACHINE=${ARCHITECTURE}
     ISCROSS=1
@@ -503,43 +462,19 @@ prepare() {
     export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
     export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
 
-    prepare_hardkernel_uboot
-
     DN_ROOTFS_RPI2="${srcdir}/rootfs-rpi2-${MACHINEARCH}"
     DN_BOOT="${DN_ROOTFS_RPI2}/boot"
     DN_ROOTFS_DEBIAN="${srcdir}/rootfs-kali-${MACHINEARCH}"
 
-    rm -rf ${DN_BOOT}
-    rm -rf ${DN_ROOTFS_RPI2}
-    #rm -rf ${DN_ROOTFS_DEBIAN}
-    mkdir -p ${DN_BOOT}
-    mkdir -p ${DN_ROOTFS_RPI2}
-    mkdir -p ${DN_ROOTFS_DEBIAN}
-
-    # toolchain
-    sudo mkdir -p ${DN_TOOLCHAIN_KERNEL}
-    sudo tar xvf "${srcdir}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" -C "${DN_TOOLCHAIN_KERNEL}"
-
-    # linux kernel for odroid
-    cd "${srcdir}/linux-hardkernel-git"
-    git submodule init
-    git submodule update
-    git checkout odroidc-3.10.y
-    make odroidc_defconfig
-    patch -p1 --no-backup-if-mismatch < ${srcdir}/${PATCH_MAC80211}
-    touch .scmversion
-
-    cp ${srcdir}/${CONFIG_KERNEL} .config
-    patch -p0 --no-backup-if-mismatch < ${srcdir}/${PATCH_CONFIG_KERNEL}
-}
-
-
-build() {
-    build_hardkernel_uboot
-
-    cd ${srcdir}
-    # create rootfs
-    kali_rootfs_debootstrap
+    export ARCH=arm
+    if [ "${ISCROSS}" = "1" ]; then
+        # 32bit compiler
+        export PATH=${DN_TOOLCHAIN_UBOOT}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux/bin/:$PATH
+        export CROSS_COMPILE=arm-none-eabi-
+    else
+        export CROSS_COMPILE=
+        unset CROSS_COMPILE
+    fi
 
     export ARCH=arm
     if [ "${ISCROSS}" = "1" ]; then
@@ -549,8 +484,113 @@ build() {
         export CROSS_COMPILE=
         unset CROSS_COMPILE
     fi
+}
+
+prepare_hardkernel_toolchains () {
+    # 32bit compiler
+    echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
+    mkdir -p ${DN_TOOLCHAIN_UBOOT}
+    tar xf ${srcdir}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
+
+    echo "[DBG] create toolchain dir for kernel ..."
+    mkdir -p ${DN_TOOLCHAIN_KERNEL}
+    tar xf "${srcdir}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" -C "${DN_TOOLCHAIN_KERNEL}"
+}
+
+
+prepare_hardkernel_uboot () {
+    # 32bit compiler
+    echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
+    mkdir -p ${DN_TOOLCHAIN_UBOOT}
+    tar xf ${srcdir}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
+
+    echo "[DBG] cd ${srcdir}/uboot-hardkernel-git ..."
+    cd "${srcdir}/uboot-hardkernel-git"
+    git checkout odroidc-v2011.03
+    if [ ! "$?" = "0" ]; then
+        echo "Error in git"
+        exit 1
+    fi
+}
+
+prepare_hardkernel_kernel () {
+    # linux kernel for odroid
+    cd "${srcdir}/linux-hardkernel-git"
+    git submodule init
+    git submodule update
+    git pull --all
+    git checkout odroidc-3.10.y
+
+    patch -p1 --no-backup-if-mismatch < ${srcdir}/${PATCH_MAC80211}
+    touch .scmversion
+
+    make odroidc_defconfig
+    cp ${srcdir}/${CONFIG_KERNEL} .config
+    patch -p0 --no-backup-if-mismatch < ${srcdir}/${PATCH_CONFIG_KERNEL}
+}
+
+build_hardkernel_uboot () {
+    cd ${srcdir}/uboot-hardkernel-git
+
+    echo "[DBG] PATH=${PATH}"
+    make odroidc_config
+    make
+}
+
+install_hardkernel_uboot () {
+    PARAM_FN_IMAGE=$1
+    shift
+
+    cd ${srcdir}/uboot-hardkernel-git
+
+if [ 0 = 1 ]; then
+    BL1=bl1.bin.hardkernel
+    UBOOT=u-boot.bin
+    # install BL1/MBR
+    sudo dd if=$BL1   of=${PARAM_FN_IMAGE} bs=1 count=442
+    sudo dd if=$BL1   of=${PARAM_FN_IMAGE} bs=512 skip=1 seek=1
+    # install u-boot:
+    sudo dd if=$UBOOT of=${PARAM_FN_IMAGE} bs=512 seek=64
+else
+    cd sd_fuse
+    sh sd_fusing.sh ${PARAM_FN_IMAGE}
+fi
+}
+
+prepare0() {
+    my_setevn
+
+    rm -rf ${DN_BOOT}
+    rm -rf ${DN_ROOTFS_RPI2}
+    #rm -rf ${DN_ROOTFS_DEBIAN}
+    mkdir -p ${DN_BOOT}
+    mkdir -p ${DN_ROOTFS_RPI2}
+    mkdir -p ${DN_ROOTFS_DEBIAN}
+
+    prepare_hardkernel_toolchains
+
+    prepare_hardkernel_uboot
+    prepare_hardkernel_kernel
+
+    echo "Build rootfs ..."
+    cd ${srcdir}
+    # create rootfs
+    kali_rootfs_debootstrap
+    echo "Build rootfs DONE!"
+
+}
+
+build() {
+    my_setevn
+
+    echo "Build U-Boot ..."
+    build_hardkernel_uboot
+    echo "Build U-Boot DONE!"
+
+    echo "Build Linux kernel ..."
     cd "$srcdir/linux-raspberrypi-git"
     kali_rootfs_linuxkernel
+    echo "Build Linux kernel DONE!"
 }
 
 package() {
