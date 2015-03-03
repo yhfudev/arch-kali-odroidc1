@@ -514,11 +514,6 @@ prepare_hardkernel_toolchains () {
 }
 
 prepare_hardkernel_uboot () {
-    # 32bit compiler
-    echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
-    mkdir -p ${DN_TOOLCHAIN_UBOOT}
-    tar xf ${srcdir}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
-
     echo "[DBG] cd ${srcdir}/uboot-hardkernel-git ..."
     cd "${srcdir}/uboot-hardkernel-git"
     git checkout odroidc-v2011.03
