@@ -23,7 +23,8 @@ conflicts=('kali-odroidc1')
 
 # config for Odroid C1
 ARCHITECTURE="armhf"
-PATCH_MAC80211="kali-wifi-injection-3.18.patch"
+PATCH_MAC80211="kali-arm-build-scripts-git/patches/kali-wifi-injection-3.12.patch"
+#PATCH_MAC80211="kali-wifi-injection-3.18.patch"
 CONFIG_KERNEL="odroidc1-3.10.config"
 PATCH_CONFIG_KERNEL="odroidc1-kernel-config.patch"
 
@@ -100,7 +101,7 @@ pkgver() {
     echo ${ver:0:7}
 }
 
-PREFIX_TMP="${pkgdir}/tmptmp"
+PREFIX_TMP="${srcdir}/tmptmp"
 
 FORMAT_NAME='arm'
 FORMAT_MAGIC='\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00'
@@ -329,6 +330,7 @@ kali_rootfs_linuxkernel() {
 
 if [ 0 = 0 ]; then
     make uImage
+    make dtbs
     sudo cp arch/arm/boot/uImage arch/arm/boot/dts/meson8b_odroidc.dtb "${DN_BOOT}"
 
 else
