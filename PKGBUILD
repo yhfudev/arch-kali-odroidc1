@@ -8,8 +8,8 @@ arch=('i686' 'x86_64' 'arm')
 url="https://github.com/yhfudev/arch-kali-odroidc1.git"
 license=('GPL')
 depends=(
-    'gcc-libs' 'bash' 'libncurses-dev'
-    'qemu' 'qemu-user' 'qemu-user-static' 'binfmt-support' # cross compile and chroot
+    'gcc-libs' 'bash' 'ncurses'
+    'qemu' 'qemu-user-static' 'binfmt-support' # cross compile and chroot
     'debootstrap' # to create debian rootfs
     'dosfstools'
     #'build-essential' 'devscripts' 'fakeroot' 'kernel-package' # debian packages
@@ -60,8 +60,8 @@ source=(
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" #http://releases.linaro.org/14.09/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz
         "firmware-linux-git::git+https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
         "kali-wifi-injection-3.18.patch" #"mac80211.patch::https://raw.github.com/offensive-security/kali-arm-build-scripts/master/patches/kali-wifi-injection-3.12.patch"
-        "rpi2-3.19.config"
-        "rpi-kernel-config.patch"
+        #"rpi2-3.19.config"
+        #"rpi-kernel-config.patch"
 
         # u-boot
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
@@ -71,25 +71,25 @@ source=(
 md5sums=(
          'SKIP'
          'SKIP'
+         'd7805745171f63c2556083e20abbd8eb' # gcc for kernel
          'SKIP'
          'SKIP'
          'SKIP'
-         '37b89f74e3f9f6c20295da564ece5b8f'
-         '95560f6b44bf10f75a7515dae9c79dd5'
          'SKIP'
          'SKIP'
+         '12d6e8a0cbd2d8e130cc8f55389a95c3' # gcc for uboot
          'SKIP'
          )
 sha1sums=(
          'SKIP'
          'SKIP'
+         'b6d5f985ac254b1d60d8f01459f64d248adb7838'
          'SKIP'
          'SKIP'
          'SKIP'
-         '48ce0c7886128fb068b70b5692b60a6c5aec0e96'
-         'c0c30c8d9c53cb6694d22c0aa92d7c28f1987463'
          'SKIP'
          'SKIP'
+         '8069f484cfd5a7ea02d5bb74b56ae6c99e478d13'
          'SKIP'
          )
 
@@ -101,11 +101,17 @@ pkgver() {
 }
 
 prepare_hardkernel_uboot () {
+    echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
     mkdir -p ${DN_TOOLCHAIN_UBOOT}
-    tar xvf gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
+    tar xvf ${srcdir}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
 
-    cd ${srcdir}/uboot-hardkernel-git
+    echo "[DBG] cd ${srcdir}/uboot-hardkernel-git ..."
+    cd "${srcdir}/uboot-hardkernel-git"
     git checkout odroidc-v2011.03
+    if [ ! "$?" = "0" ]; then
+        echo "Error in git"
+        exit 1
+    fi
 }
 
 build_hardkernel_uboot () {
@@ -169,7 +175,7 @@ kali_rootfs_debootstrap() {
     shift
 
     # the apt cache folder
-    DN_APT_CACHE="${srcdir}/apt-cache-kali-${MACHINEARCH}"
+    DN_APT_CACHE="${pkgdir}/apt-cache-kali-${MACHINEARCH}"
     mkdir -p "${DN_APT_CACHE}"
     mkdir -p "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
@@ -512,13 +518,13 @@ prepare() {
 
     # toolchain
     sudo mkdir -p ${DN_TOOLCHAIN_KERNEL}
-    sudo tar xvf gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz -C ${DN_TOOLCHAIN_KERNEL}
+    sudo tar xvf "${srcdir}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" -C "${DN_TOOLCHAIN_KERNEL}"
 
     # linux kernel for odroid
-    cd "$srcdir/linux-hardkernel-git"
+    cd "${srcdir}/linux-hardkernel-git"
     git submodule init
     git submodule update
-    git checkout odroidc-3.10.y-android
+    git checkout odroidc-3.10.y
     make odroidc_defconfig
     patch -p1 --no-backup-if-mismatch < ${srcdir}/${PATCH_MAC80211}
     touch .scmversion
