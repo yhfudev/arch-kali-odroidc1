@@ -100,6 +100,7 @@ pkgver() {
     echo ${ver:0:7}
 }
 
+PREFIX_TMP="${pkgdir}/tmptmp"
 
 FORMAT_NAME='arm'
 FORMAT_MAGIC='\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00'
@@ -152,16 +153,32 @@ kali_rootfs_debootstrap() {
     sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     echo "[DBG] debootstrap state 1"
-    # create the rootfs - not much to modify here, except maybe the hostname.
-    echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
-    sudo debootstrap --foreign --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
+    if [[ -f "${PREFIX_TMP}_FLG_KALI_ROOTFS_STAGE1" ]]; then
+        echo "[DBG] SKIP debootstrap state 1"
+
+    else
+        # create the rootfs - not much to modify here, except maybe the hostname.
+        echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
+        sudo debootstrap --foreign --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
+        if [ "$?" = "0" ]; then
+            touch "${PREFIX_TMP}_FLG_KALI_ROOTFS_STAGE1"
+        fi
+    fi
 
     if [ "${ISCROSS}" = "1" ]; then
         sudo cp /usr/bin/qemu-arm-static "${DN_ROOTFS_DEBIAN}/usr/bin/"
     fi
 
     echo "[DBG] debootstrap state 2"
-    sudo chroot "${DN_ROOTFS_DEBIAN}" /usr/bin/env -i LANG=C /debootstrap/debootstrap --second-stage
+    if [[ -f "${PREFIX_TMP}_FLG_KALI_ROOTFS_STAGE2" ]]; then
+        echo "[DBG] SKIP debootstrap state 2"
+
+    else
+        sudo chroot "${DN_ROOTFS_DEBIAN}" /usr/bin/env -i LANG=C /debootstrap/debootstrap --second-stage
+        if [ "$?" = "0" ]; then
+            touch "${PREFIX_TMP}_FLG_KALI_ROOTFS_STAGE2"
+        fi
+    fi
 
     echo "[DBG] debootstrap state 2.5"
     # Create sources.list
@@ -204,13 +221,6 @@ EOF
     export LC_ALL=C
     export DEBIAN_FRONTEND=noninteractive
 
-    #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/proc"
-    #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/"
-    #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/pts"
-    sudo mount -t proc proc "${DN_ROOTFS_DEBIAN}/proc"
-    sudo mount -o bind /dev/ "${DN_ROOTFS_DEBIAN}/dev/"
-    sudo mount -o bind /dev/pts "${DN_ROOTFS_DEBIAN}/dev/pts"
-
     cat << EOF > /tmp/deb
 console-common console-data/keymap/policy select Select keymap from full list
 console-common console-data/keymap/full select en-latin1-nodeadkeys
@@ -218,7 +228,18 @@ EOF
     sudo mv /tmp/deb "${DN_ROOTFS_DEBIAN}/debconf.set"
 
     echo "[DBG] debootstrap state 3"
-    cat << EOF > /tmp/ths
+    if [[ -f "${PREFIX_TMP}_FLG_KALI_ROOTFS_STAGE3" ]]; then
+        echo "[DBG] SKIP debootstrap state 3"
+
+    else
+        #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/proc"
+        #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/"
+        #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/pts"
+        sudo mount -t proc proc "${DN_ROOTFS_DEBIAN}/proc"
+        sudo mount -o bind /dev/ "${DN_ROOTFS_DEBIAN}/dev/"
+        sudo mount -o bind /dev/pts "${DN_ROOTFS_DEBIAN}/dev/pts"
+
+        cat << EOF > /tmp/ths
 #!/bin/bash
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:$PATH
 export DEBIAN_FRONTEND=noninteractive
@@ -249,12 +270,15 @@ dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
 
 rm -f /third-stage
 EOF
-    chmod +x /tmp/ths
-    sudo mv /tmp/ths "${DN_ROOTFS_DEBIAN}/third-stage"
+        chmod +x /tmp/ths
+        sudo mv /tmp/ths "${DN_ROOTFS_DEBIAN}/third-stage"
 
-    sudo chroot "${DN_ROOTFS_DEBIAN}" /third-stage
-
-    sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+        sudo chroot "${DN_ROOTFS_DEBIAN}" /third-stage
+        if [ "$?" = "0" ]; then
+            touch "${PREFIX_TMP}_FLG_KALI_ROOTFS_STAGE3"
+        fi
+        sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+    fi
 
     cat << EOF > /tmp/cln
 #!/bin/bash
@@ -360,15 +384,15 @@ kali_create_image() {
     # Create the disk and partition it
 
     echo "Creating image file for ${pkgdesc}"
-    if [ ! -f "${FN_IMAGE}" ]; then
+    if [[ ! -f "${FN_IMAGE}" || ! -f "${PREFIX_TMP}_FLG_KALI_CREATE_IMAGE" ]]; then
         # check Ubuntu Partition Table http://odroid.com/dokuwiki/doku.php?id=en:c1_partition_table
         dd if=/dev/zero of=${FN_IMAGE} bs=1M count=${IMGCONTAINER_SIZE}
         parted ${FN_IMAGE} --script -- mklabel msdos
         parted ${FN_IMAGE} --script -- mkpart primary fat32   3072s 266239s
         parted ${FN_IMAGE} --script -- mkpart primary ext4  266240s    100%
+        touch "${PREFIX_TMP}_FLG_KALI_CREATE_IMAGE"
     fi
     install_hardkernel_uboot ${FN_IMAGE}
-
 
     # Set the partition variables
     DEV_LOOP=$(sudo losetup -f --show ${FN_IMAGE})
@@ -462,9 +486,18 @@ my_setevn() {
     export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
     export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
 
-    DN_ROOTFS_RPI2="${srcdir}/rootfs-rpi2-${MACHINEARCH}"
+    DN_ROOTFS_RPI2="${srcdir}/rootfs-odroidc1-${MACHINEARCH}"
     DN_BOOT="${DN_ROOTFS_RPI2}/boot"
     DN_ROOTFS_DEBIAN="${srcdir}/rootfs-kali-${MACHINEARCH}"
+
+    export ARCH=arm
+    if [ "${ISCROSS}" = "1" ]; then
+        export PATH=${DN_TOOLCHAIN_KERNEL}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/:$PATH
+        export CROSS_COMPILE=arm-linux-gnueabihf-
+    else
+        export CROSS_COMPILE=
+        unset CROSS_COMPILE
+    fi
 }
 
 prepare_hardkernel_toolchains () {
@@ -549,6 +582,7 @@ fi
 
 prepare() {
     my_setevn
+    rm -f ${PREFIX_TMP}*
 
     rm -rf ${DN_BOOT}
     rm -rf ${DN_ROOTFS_RPI2}
