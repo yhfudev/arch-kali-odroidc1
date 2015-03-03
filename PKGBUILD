@@ -134,7 +134,7 @@ kali_rootfs_debootstrap() {
     shift
 
     # the apt cache folder
-    DN_APT_CACHE="${pkgdir}/apt-cache-kali-${MACHINEARCH}"
+    DN_APT_CACHE="${SRCPKGDEST}/apt-cache-kali-${MACHINEARCH}"
     mkdir -p "${DN_APT_CACHE}"
     mkdir -p "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
@@ -465,25 +465,6 @@ my_setevn() {
     DN_ROOTFS_RPI2="${srcdir}/rootfs-rpi2-${MACHINEARCH}"
     DN_BOOT="${DN_ROOTFS_RPI2}/boot"
     DN_ROOTFS_DEBIAN="${srcdir}/rootfs-kali-${MACHINEARCH}"
-
-    export ARCH=arm
-    if [ "${ISCROSS}" = "1" ]; then
-        # 32bit compiler
-        export PATH=${DN_TOOLCHAIN_UBOOT}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux/bin/:$PATH
-        export CROSS_COMPILE=arm-none-eabi-
-    else
-        export CROSS_COMPILE=
-        unset CROSS_COMPILE
-    fi
-
-    export ARCH=arm
-    if [ "${ISCROSS}" = "1" ]; then
-        export PATH=${DN_TOOLCHAIN_KERNEL}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/:$PATH
-        export CROSS_COMPILE=arm-linux-gnueabihf-
-    else
-        export CROSS_COMPILE=
-        unset CROSS_COMPILE
-    fi
 }
 
 prepare_hardkernel_toolchains () {
@@ -496,7 +477,6 @@ prepare_hardkernel_toolchains () {
     mkdir -p ${DN_TOOLCHAIN_KERNEL}
     tar xf "${srcdir}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" -C "${DN_TOOLCHAIN_KERNEL}"
 }
-
 
 prepare_hardkernel_uboot () {
     # 32bit compiler
@@ -532,6 +512,16 @@ prepare_hardkernel_kernel () {
 build_hardkernel_uboot () {
     cd ${srcdir}/uboot-hardkernel-git
 
+    export ARCH=arm
+    if [ "${ISCROSS}" = "1" ]; then
+        # 32bit compiler
+        export PATH=${DN_TOOLCHAIN_UBOOT}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux/bin/:$PATH
+        export CROSS_COMPILE=arm-none-eabi-
+    else
+        export CROSS_COMPILE=
+        unset CROSS_COMPILE
+    fi
+
     echo "[DBG] PATH=${PATH}"
     make odroidc_config
     make
@@ -557,7 +547,7 @@ else
 fi
 }
 
-prepare0() {
+prepare() {
     my_setevn
 
     rm -rf ${DN_BOOT}
@@ -577,7 +567,6 @@ prepare0() {
     # create rootfs
     kali_rootfs_debootstrap
     echo "Build rootfs DONE!"
-
 }
 
 build() {
@@ -587,6 +576,14 @@ build() {
     build_hardkernel_uboot
     echo "Build U-Boot DONE!"
 
+    export ARCH=arm
+    if [ "${ISCROSS}" = "1" ]; then
+        export PATH=${DN_TOOLCHAIN_KERNEL}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/:$PATH
+        export CROSS_COMPILE=arm-linux-gnueabihf-
+    else
+        export CROSS_COMPILE=
+        unset CROSS_COMPILE
+    fi
     echo "Build Linux kernel ..."
     cd "$srcdir/linux-raspberrypi-git"
     kali_rootfs_linuxkernel
