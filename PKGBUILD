@@ -617,7 +617,7 @@ build() {
         unset CROSS_COMPILE
     fi
     echo "Build Linux kernel ..."
-    cd "$srcdir/linux-raspberrypi-git"
+    cd "${srcdir}/linux-hardkernel-git"
     kali_rootfs_linuxkernel
     echo "Build Linux kernel DONE!"
 }
