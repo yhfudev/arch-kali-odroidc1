@@ -11,7 +11,8 @@ depends=(
     'gcc-libs' 'bash' 'ncurses'
     'qemu' 'qemu-user-static' 'binfmt-support' # cross compile and chroot
     'debootstrap' # to create debian rootfs
-    'dosfstools'
+    'parted' 'dosfstools'
+    'lib32-libstdc++5' 'lib32-zlib' # for 32 bit compiler
     #'build-essential' 'devscripts' 'fakeroot' 'kernel-package' # debian packages
     )
 makedepends=('git')
@@ -455,7 +456,7 @@ EOF
     MACHINE_TYPE=$(uname -m)
     if [ ${MACHINE_TYPE} == 'x86_64' ]; then
         echo "Compressing ${FN_IMAGE}"
-        pixz ${FN_IMAGE} ${FN_IMAGE}.xz
+        xz ${FN_IMAGE} ${FN_IMAGE}.xz
         if [ "$?" = "0" ]; then
             rm -f ${FN_IMAGE}
             echo "Generating sha1sum for ${FN_IMAGE}.xz"
