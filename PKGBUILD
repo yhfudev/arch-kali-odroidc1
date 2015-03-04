@@ -329,12 +329,21 @@ kali_rootfs_linuxkernel() {
         CORES=2
     fi
 
-    # compile linux kernel for Raspberry Pi 2
-    make -j $CORES
-    make -j $CORES modules
+    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_KERNEL_COMPILE_CORE" ]]; then
+        echo "[DBG] SKIP compile kernel core"
 
-    # install kernel
-    make -j $CORES modules_install INSTALL_MOD_PATH=${DN_ROOTFS_KERNEL}
+    else
+        # compile linux kernel for Raspberry Pi 2
+        make clean
+        make -j $CORES
+        make -j $CORES modules
+
+        # install kernel
+        make -j $CORES modules_install INSTALL_MOD_PATH=${DN_ROOTFS_KERNEL}
+        if [ "$?" = "0" ]; then
+            touch "${PREFIX_TMP}-${pkgname}-FLG_KERNEL_COMPILE_CORE"
+        fi
+    fi
 
     rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware
     #git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git ${DN_ROOTFS_KERNEL}/lib/firmware
@@ -402,13 +411,15 @@ kali_create_image() {
         parted ${FN_IMAGE} --script -- mklabel msdos
         parted ${FN_IMAGE} --script -- mkpart primary fat32   3072s 266239s
         parted ${FN_IMAGE} --script -- mkpart primary ext4  266240s    100%
+
+        install_hardkernel_uboot ${FN_IMAGE}
+
         touch "${PREFIX_TMP}-${pkgname}-FLG_KALI_CREATE_IMAGE"
     else
         echo "[DBG] SKIP creating image file ${FN_IMAGE}"
     fi
 
-    install_hardkernel_uboot ${FN_IMAGE}
-
+if [[ ! -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_ROOTFS" || ! -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_KERNEL" ]]; then
     # Set the partition variables
     DEV_LOOP=$(sudo losetup -f --show ${FN_IMAGE})
     if [ "${DEV_LOOP}" = "" ]; then
@@ -423,24 +434,58 @@ kali_create_image() {
     bootp="/dev/mapper/${LOOPNAME}p1"
     rootp="/dev/mapper/${LOOPNAME}p2"
 
-    # Create file systems
-    sudo mkfs.vfat -n boot $bootp
-    sudo mkfs.ext4 -L root $rootp
+    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" ]]; then
+        echo "[DBG] SKIP rsync rootfs"
+
+    else
+        echo "Create file systems"
+        sudo mkfs.vfat -n boot $bootp
+        if [ ! "$?" = "0" ]; then
+            echo "error in format boot"
+            exit 1
+        fi
+        sudo mkfs.ext4 -L root $rootp
+        if [ ! "$?" = "0" ]; then
+            echo "error in format root"
+            exit 1
+        fi
+        touch "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE"
+    fi
 
     # Create the dirs for the partitions and mount them
     DN_ROOT="${srcdir}/mntrootfs-${MACHINEARCH}-${pkgname}"
     mkdir -p ${DN_ROOT}
     sudo mount $rootp ${DN_ROOT}
+    if [ ! "$?" = "0" ]; then
+        echo "error in mount root"
+        exit 1
+    fi
 
     DN_BOOT=${DN_ROOT}/boot
     sudo mkdir -p ${DN_BOOT}
     sudo mount $bootp ${DN_BOOT}
+    if [ ! "$?" = "0" ]; then
+        echo "error in mount boot"
+        exit 1
+    fi
 
-    echo "Rsyncing rootfs into image file"
-    rsync_and_verify "${PARAM_DN_ROOTFS_DEBIAN}/" ${DN_ROOT}/
+    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_ROOTFS" ]]; then
+        echo "[DBG] SKIP rsync rootfs"
 
-    echo "Rsyncing kernel into image file"
-    rsync_and_verify "${PARAM_DN_ROOTFS_KERNEL}/" ${DN_ROOT}/
+    else
+        echo "Rsyncing rootfs into image file"
+        rsync_and_verify "${PARAM_DN_ROOTFS_DEBIAN}/" ${DN_ROOT}/
+        touch "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_ROOTFS"
+    fi
+
+    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_KERNEL" ]]; then
+        echo "[DBG] SKIP rsync rootfs"
+
+    else
+        echo "Rsyncing kernel into image file"
+        rsync_and_verify "${PARAM_DN_ROOTFS_KERNEL}/" ${DN_ROOT}/
+        touch "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_KERNEL"
+    fi
 
     # Enable login over serial
     echo "echo 'T0:23:respawn:/sbin/agetty -L ttyAMA0 115200 vt100' >> ${DN_ROOT}/etc/inittab" | sudo sh
@@ -450,6 +495,10 @@ kali_create_image() {
     sudo umount ${DN_ROOT}
     sudo kpartx -dv ${DEV_LOOP}
     sudo losetup -d ${DEV_LOOP}
+    if [ ! "$?" = "0" ]; then
+        echo "error in losetup"
+        exit 1
+    fi
 
     # Clean up all the temporary build stuff and remove the directories.
     # Comment this out to keep things around if you want to see what may have gone
@@ -473,6 +522,7 @@ kali_create_image() {
             sha1sum ${FN_IMAGE}.xz > ${FN_IMAGE}.xz.sha1sum
         fi
     fi
+fi
 }
 
 my_setevn() {
