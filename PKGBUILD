@@ -252,13 +252,13 @@ echo -e "#!/bin/sh\nexit 101" > /usr/sbin/policy-rc.d
 chmod +x /usr/sbin/policy-rc.d
 
 apt-get update
-apt-get install locales-all
+apt-get --yes --force-yes install locales-all
 
 debconf-set-selections /debconf.set
 rm -f /debconf.set
 apt-get update
-apt-get -y install git-core binutils ca-certificates initramfs-tools uboot-mkimage
-apt-get -y install locales console-common less nano git
+apt-get --yes --force-yes install git-core binutils ca-certificates initramfs-tools uboot-mkimage
+apt-get --yes --force-yes install locales console-common less nano git
 echo "root:toor" | chpasswd
 sed -i -e 's/KERNEL\!=\"eth\*|/KERNEL\!=\"/' /lib/udev/rules.d/75-persistent-net-generator.rules
 rm -f /etc/udev/rules.d/70-persistent-net.rules
@@ -383,9 +383,7 @@ kali_create_image() {
     PARAM_DN_ROOTFS_RPI2="$1"
     shift
 
-    FN_IMAGE="${srcdir}/${pkgname}-${pkgver}-${MACHINEARCH}.img"
     # Create the disk and partition it
-
     echo "Creating image file for ${pkgdesc}"
     if [[ ! -f "${FN_IMAGE}" || ! -f "${PREFIX_TMP}_FLG_KALI_CREATE_IMAGE" ]]; then
         # check Ubuntu Partition Table http://odroid.com/dokuwiki/doku.php?id=en:c1_partition_table
@@ -486,6 +484,8 @@ my_setevn() {
     esac
     export MACHINEARCH="${MACHINE}"
 
+    export FN_IMAGE="${srcdir}/${pkgname}-${pkgver}-${MACHINEARCH}.img"
+
     export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
     export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
 
@@ -580,7 +580,7 @@ fi
 
 prepare() {
     my_setevn
-    rm -f ${PREFIX_TMP}*
+    rm -f "${FN_IMAGE}" ${PREFIX_TMP}*
 
     rm -rf ${DN_BOOT}
     rm -rf ${DN_ROOTFS_RPI2}
