@@ -152,6 +152,10 @@ kali_rootfs_debootstrap() {
     if [ ! -f /usr/share/debootstrap/scripts/kali ]; then
         sudo ln -s /usr/share/debootstrap/scripts/sid /usr/share/debootstrap/scripts/kali
     fi
+    if [ ! -f /usr/share/debootstrap/scripts/kali ]; then
+        echo "Error: no deebootstrap for kali"
+        exit 1
+    fi
 
     if [ "${ISCROSS}" = "1" ]; then
         register_qemuarm
@@ -169,6 +173,9 @@ kali_rootfs_debootstrap() {
         sudo debootstrap --foreign --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1"
+        else
+            echo "Error in debootstarap stage 1"
+            exit 1
         fi
     fi
 
@@ -184,6 +191,9 @@ kali_rootfs_debootstrap() {
         sudo chroot "${DN_ROOTFS_DEBIAN}" /usr/bin/env -i LANG=C /debootstrap/debootstrap --second-stage
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE2"
+        else
+            echo "Error in debootstrap stage 2"
+            exit 1
         fi
     fi
 
@@ -194,6 +204,10 @@ deb http://${INSTALL_MIRROR}/kali kali main contrib non-free
 deb http://${INSTALL_SECURITY}/kali-security kali/updates main contrib non-free
 EOF
     sudo mv "${PREFIX_TMP}-list" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move apt/sources.list"
+        exit 1
+    fi
 
     # Set hostname
 
@@ -209,6 +223,10 @@ ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
     sudo mv "${PREFIX_TMP}-host" "${DN_ROOTFS_DEBIAN}/etc/hosts"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move hosts"
+        exit 1
+    fi
 
     cat << EOF > "${PREFIX_TMP}-net"
 auto lo
@@ -223,6 +241,10 @@ EOF
 nameserver 8.8.8.8
 EOF
     sudo mv "${PREFIX_TMP}-reso" "${DN_ROOTFS_DEBIAN}/etc/resolv.conf"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move resolv.conf"
+        exit 1
+    fi
 
     export MALLOC_CHECK_=0 # workaround for LP: #520465
     export LC_ALL=C
@@ -233,6 +255,10 @@ console-common console-data/keymap/policy select Select keymap from full list
 console-common console-data/keymap/full select en-latin1-nodeadkeys
 EOF
     sudo mv "${PREFIX_TMP}-deb" "${DN_ROOTFS_DEBIAN}/debconf.set"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move script debconf.set"
+        exit 1
+    fi
 
     echo "[DBG] debootstrap state 3"
     if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3" ]]; then
@@ -245,6 +271,10 @@ EOF
         sudo mount -t proc proc "${DN_ROOTFS_DEBIAN}/proc"
         sudo mount -o bind /dev/ "${DN_ROOTFS_DEBIAN}/dev/"
         sudo mount -o bind /dev/pts "${DN_ROOTFS_DEBIAN}/dev/pts"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in mount /dev"
+            exit 1
+        fi
 
         cat << EOF > "${PREFIX_TMP}-ths"
 #!/bin/bash
@@ -279,12 +309,20 @@ rm -f /third-stage
 EOF
         chmod +x "${PREFIX_TMP}-ths"
         sudo mv "${PREFIX_TMP}-ths" "${DN_ROOTFS_DEBIAN}/third-stage"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in move script third-stage"
+            exit 1
+        fi
 
         sudo chroot "${DN_ROOTFS_DEBIAN}" /third-stage
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
+        else
+            echo "Error in debootstrap stage 3"
+            exit 1
         fi
     fi
+
     sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     cat << EOF > "${PREFIX_TMP}-aptlst"
@@ -325,6 +363,10 @@ EOF
     sudo umount "${DN_ROOTFS_DEBIAN}/dev/pts"
     sudo umount "${DN_ROOTFS_DEBIAN}/dev/"
     sudo umount "${DN_ROOTFS_DEBIAN}/proc"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in unmount /dev"
+        exit 1
+    fi
 
     if [ "${ISCROSS}" = "1" ]; then
         unregister_qemuarm
@@ -347,11 +389,18 @@ kali_rootfs_linuxkernel() {
         make clean
         make -j $CORES
         make -j $CORES modules
+        if [ ! "$?" = "0" ]; then
+            echo "Error in compiling linux kernel"
+            exit 1
+        fi
 
         # install kernel
         make -j $CORES modules_install INSTALL_MOD_PATH=${DN_ROOTFS_KERNEL}
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE"
+        else
+            echo "Error in installing  linux kernel modules"
+            exit 1
         fi
     fi
 
@@ -418,7 +467,15 @@ kali_create_image() {
         echo "Creating image file for ${pkgdesc}: ${FN_IMAGE}"
         # check Ubuntu Partition Table http://odroid.com/dokuwiki/doku.php?id=en:c1_partition_table
         dd if=/dev/zero of=${FN_IMAGE} bs=1M count=${IMGCONTAINER_SIZE}
+        if [ ! "$?" = "0" ]; then
+            echo "error in dd"
+            exit 1
+        fi
         parted ${FN_IMAGE} --script -- mklabel msdos
+        if [ ! "$?" = "0" ]; then
+            echo "error in parted"
+            exit 1
+        fi
         parted ${FN_IMAGE} --script -- mkpart primary fat32   3072s 266239s
         parted ${FN_IMAGE} --script -- mkpart primary ext4  266240s    100%
 
@@ -473,6 +530,10 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
 
     DN_BOOT=${DN_ROOT}/boot
     sudo mkdir -p ${DN_BOOT}
+    if [ ! "$?" = "0" ]; then
+        echo "error in mkdir ${DN_ROOT}"
+        exit 1
+    fi
     sudo mount $bootp ${DN_BOOT}
     if [ ! "$?" = "0" ]; then
         echo "error in mount boot"
@@ -520,7 +581,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
     # don't need the sha1sum or to compress the image, since you will be testing it
     # soon.
     echo "Generating sha1sum for ${FN_IMAGE}"
-    sha1sum ${FN_IMAGE} > ${FN_IMAGE}.sha1sum
+    (cd $(dirname ${FN_IMAGE}) && sha1sum $(basename ${FN_IMAGE}) > ${FN_IMAGE}.sha1sum)
     # Don't pixz on 32bit, there isn't enough memory to compress the images.
     MACHINE_TYPE=$(uname -m)
     if [ ${MACHINE_TYPE} == 'x86_64' ]; then
@@ -529,7 +590,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         if [ "$?" = "0" ]; then
             rm -f ${FN_IMAGE}
             echo "Generating sha1sum for ${FN_IMAGE}.xz"
-            sha1sum ${FN_IMAGE}.xz > ${FN_IMAGE}.xz.sha1sum
+            (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
         fi
     fi
 fi
