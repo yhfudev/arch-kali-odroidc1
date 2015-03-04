@@ -551,7 +551,7 @@ my_setevn() {
     export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
     export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
 
-    DN_ROOTFS_KERNEL="${srcdir}/rootfs-kernel-${MACHINEARCH}"
+    DN_ROOTFS_KERNEL="${srcdir}/rootfs-kernel-${MACHINEARCH}-${pkgname}"
     DN_BOOT="${DN_ROOTFS_KERNEL}/boot"
     DN_ROOTFS_DEBIAN="${srcdir}/rootfs-kali-${MACHINEARCH}-${pkgname}"
 
