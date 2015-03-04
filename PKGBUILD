@@ -107,7 +107,7 @@ pkgver() {
     echo ${ver:0:7}
 }
 
-PREFIX_TMP="${srcdir}/tmptmp"
+PREFIX_TMP="${srcdir}/tmptmp-${pkgname}"
 
 FORMAT_NAME='arm'
 FORMAT_MAGIC='\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00'
@@ -160,7 +160,7 @@ kali_rootfs_debootstrap() {
     sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     echo "[DBG] debootstrap state 1"
-    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_KALI_ROOTFS_STAGE1" ]]; then
+    if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1" ]]; then
         echo "[DBG] SKIP debootstrap state 1"
 
     else
@@ -168,7 +168,7 @@ kali_rootfs_debootstrap() {
         echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
         sudo debootstrap --foreign --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
         if [ "$?" = "0" ]; then
-            touch "${PREFIX_TMP}-${pkgname}-FLG_KALI_ROOTFS_STAGE1"
+            touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1"
         fi
     fi
 
@@ -177,30 +177,30 @@ kali_rootfs_debootstrap() {
     fi
 
     echo "[DBG] debootstrap state 2"
-    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_KALI_ROOTFS_STAGE2" ]]; then
+    if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE2" ]]; then
         echo "[DBG] SKIP debootstrap state 2"
 
     else
         sudo chroot "${DN_ROOTFS_DEBIAN}" /usr/bin/env -i LANG=C /debootstrap/debootstrap --second-stage
         if [ "$?" = "0" ]; then
-            touch "${PREFIX_TMP}-${pkgname}-FLG_KALI_ROOTFS_STAGE2"
+            touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE2"
         fi
     fi
 
     echo "[DBG] debootstrap state 2.5"
     # Create sources.list
-    cat << EOF > /tmp/list
+    cat << EOF > "${PREFIX_TMP}-list"
 deb http://${INSTALL_MIRROR}/kali kali main contrib non-free
 deb http://${INSTALL_SECURITY}/kali-security kali/updates main contrib non-free
 EOF
-    sudo mv /tmp/list "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
+    sudo mv "${PREFIX_TMP}-list" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
 
     # Set hostname
 
     echo "echo kali > '${DN_ROOTFS_DEBIAN}/etc/hostname'" | sudo sh
 
     # So X doesn't complain, we add kali to hosts
-    cat << EOF > /tmp/host
+    cat << EOF > "${PREFIX_TMP}-host"
 127.0.0.1       kali    localhost
 ::1             localhost ip6-localhost ip6-loopback
 fe00::0         ip6-localnet
@@ -208,34 +208,34 @@ ff00::0         ip6-mcastprefix
 ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
-    sudo mv /tmp/host "${DN_ROOTFS_DEBIAN}/etc/hosts"
+    sudo mv "${PREFIX_TMP}-host" "${DN_ROOTFS_DEBIAN}/etc/hosts"
 
-    cat << EOF > /tmp/net
+    cat << EOF > "${PREFIX_TMP}-net"
 auto lo
 iface lo inet loopback
 
 auto eth0
 iface eth0 inet dhcp
 EOF
-    sudo mv /tmp/net "${DN_ROOTFS_DEBIAN}/etc/network/interfaces"
+    sudo mv "${PREFIX_TMP}-net" "${DN_ROOTFS_DEBIAN}/etc/network/interfaces"
 
-    cat << EOF > /tmp/reso
+    cat << EOF > "${PREFIX_TMP}-reso"
 nameserver 8.8.8.8
 EOF
-    sudo mv /tmp/reso "${DN_ROOTFS_DEBIAN}/etc/resolv.conf"
+    sudo mv "${PREFIX_TMP}-reso" "${DN_ROOTFS_DEBIAN}/etc/resolv.conf"
 
     export MALLOC_CHECK_=0 # workaround for LP: #520465
     export LC_ALL=C
     export DEBIAN_FRONTEND=noninteractive
 
-    cat << EOF > /tmp/deb
+    cat << EOF > "${PREFIX_TMP}-deb"
 console-common console-data/keymap/policy select Select keymap from full list
 console-common console-data/keymap/full select en-latin1-nodeadkeys
 EOF
-    sudo mv /tmp/deb "${DN_ROOTFS_DEBIAN}/debconf.set"
+    sudo mv "${PREFIX_TMP}-deb" "${DN_ROOTFS_DEBIAN}/debconf.set"
 
     echo "[DBG] debootstrap state 3"
-    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_KALI_ROOTFS_STAGE3" ]]; then
+    if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3" ]]; then
         echo "[DBG] SKIP debootstrap state 3"
 
     else
@@ -246,7 +246,7 @@ EOF
         sudo mount -o bind /dev/ "${DN_ROOTFS_DEBIAN}/dev/"
         sudo mount -o bind /dev/pts "${DN_ROOTFS_DEBIAN}/dev/pts"
 
-        cat << EOF > /tmp/ths
+        cat << EOF > "${PREFIX_TMP}-ths"
 #!/bin/bash
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:$PATH
 export DEBIAN_FRONTEND=noninteractive
@@ -277,26 +277,26 @@ dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
 
 rm -f /third-stage
 EOF
-        chmod +x /tmp/ths
-        sudo mv /tmp/ths "${DN_ROOTFS_DEBIAN}/third-stage"
+        chmod +x "${PREFIX_TMP}-ths"
+        sudo mv "${PREFIX_TMP}-ths" "${DN_ROOTFS_DEBIAN}/third-stage"
 
         sudo chroot "${DN_ROOTFS_DEBIAN}" /third-stage
         if [ "$?" = "0" ]; then
-            touch "${PREFIX_TMP}-${pkgname}-FLG_KALI_ROOTFS_STAGE3"
+            touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
         fi
         sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
     fi
 
-    cat << EOF > /tmp/aptlst
+    cat << EOF > "${PREFIX_TMP}-aptlst"
 deb http://http.kali.org/kali kali main non-free contrib
 deb http://security.kali.org/kali-security kali/updates main contrib non-free
 
 deb-src http://http.kali.org/kali kali main non-free contrib
 deb-src http://security.kali.org/kali-security kali/updates main contrib non-free
 EOF
-    sudo mv /tmp/aptlst "${DN_ROOT}/etc/apt/sources.list"
+    sudo mv "${PREFIX_TMP}-aptlst" "${DN_ROOT}/etc/apt/sources.list"
 
-    cat << EOF > /tmp/cln
+    cat << EOF > "${PREFIX_TMP}-cln"
 #!/bin/bash
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:$PATH
 export DEBIAN_FRONTEND=noninteractive
@@ -308,8 +308,8 @@ rm -f /hs_err*
 rm -f /cleanup
 rm -f /usr/bin/qemu*
 EOF
-    chmod +x /tmp/cln
-    sudo mv /tmp/cln "${DN_ROOTFS_DEBIAN}/cleanup"
+    chmod +x "${PREFIX_TMP}-cln"
+    sudo mv "${PREFIX_TMP}-cln" "${DN_ROOTFS_DEBIAN}/cleanup"
 
     sudo chroot "${DN_ROOTFS_DEBIAN}" /cleanup
 
@@ -331,7 +331,7 @@ kali_rootfs_linuxkernel() {
         CORES=2
     fi
 
-    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_KERNEL_COMPILE_CORE" ]]; then
+    if [[ -f "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE" ]]; then
         echo "[DBG] SKIP compile kernel core"
 
     else
@@ -343,7 +343,7 @@ kali_rootfs_linuxkernel() {
         # install kernel
         make -j $CORES modules_install INSTALL_MOD_PATH=${DN_ROOTFS_KERNEL}
         if [ "$?" = "0" ]; then
-            touch "${PREFIX_TMP}-${pkgname}-FLG_KERNEL_COMPILE_CORE"
+            touch "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE"
         fi
     fi
 
@@ -384,10 +384,10 @@ rsync_and_verify() {
 if [ 1 = 0 ]; then
     # verify the files
     cd "${PARAM_DN_SRC}/"
-    sudo find . -type f | sudo xargs -n 1 md5sum > /tmp/md5sum-root
+    sudo find . -type f | sudo xargs -n 1 md5sum > "${PREFIX_TMP}-md5sum-root"
     cd -
     cd "${PARAM_DN_DST}"
-    sudo md5sum -c /tmp/md5sum-root
+    sudo md5sum -c "${PREFIX_TMP}-md5sum-root"
     RET=$?
     cd -
     if [ "$RET" = "1" ]; then
@@ -406,7 +406,7 @@ kali_create_image() {
     shift
 
     # Create the disk and partition it
-    if [[ ! -f "${FN_IMAGE}" || ! -f "${PREFIX_TMP}-${pkgname}-FLG_KALI_CREATE_IMAGE" ]]; then
+    if [[ ! -f "${FN_IMAGE}" || ! -f "${PREFIX_TMP}-FLG_KALI_CREATE_IMAGE" ]]; then
         echo "Creating image file for ${pkgdesc}: ${FN_IMAGE}"
         # check Ubuntu Partition Table http://odroid.com/dokuwiki/doku.php?id=en:c1_partition_table
         dd if=/dev/zero of=${FN_IMAGE} bs=1M count=${IMGCONTAINER_SIZE}
@@ -416,12 +416,12 @@ kali_create_image() {
 
         install_hardkernel_uboot ${FN_IMAGE}
 
-        touch "${PREFIX_TMP}-${pkgname}-FLG_KALI_CREATE_IMAGE"
+        touch "${PREFIX_TMP}-FLG_KALI_CREATE_IMAGE"
     else
         echo "[DBG] SKIP creating image file ${FN_IMAGE}"
     fi
 
-if [[ ! -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_ROOTFS" || ! -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_KERNEL" ]]; then
+if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROOTFS" || ! -f "${PREFIX_TMP}-FLG_RSYNC_KERNEL" ]]; then
     # Set the partition variables
     DEV_LOOP=$(sudo losetup -f --show ${FN_IMAGE})
     if [ "${DEV_LOOP}" = "" ]; then
@@ -436,7 +436,7 @@ if [[ ! -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-${
     bootp="/dev/mapper/${LOOPNAME}p1"
     rootp="/dev/mapper/${LOOPNAME}p2"
 
-    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" ]]; then
+    if [[ -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" ]]; then
         echo "[DBG] SKIP rsync rootfs"
 
     else
@@ -451,7 +451,7 @@ if [[ ! -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-${
             echo "error in format root"
             exit 1
         fi
-        touch "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE"
+        touch "${PREFIX_TMP}-FLG_FORMAT_IMAGE"
     fi
 
     # Create the dirs for the partitions and mount them
@@ -471,22 +471,22 @@ if [[ ! -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-${
         exit 1
     fi
 
-    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_ROOTFS" ]]; then
+    if [[ -f "${PREFIX_TMP}-FLG_RSYNC_ROOTFS" ]]; then
         echo "[DBG] SKIP rsync rootfs"
 
     else
         echo "Rsyncing rootfs into image file"
         rsync_and_verify "${PARAM_DN_ROOTFS_DEBIAN}/" ${DN_ROOT}/
-        touch "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_ROOTFS"
+        touch "${PREFIX_TMP}-FLG_RSYNC_ROOTFS"
     fi
 
-    if [[ -f "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_KERNEL" ]]; then
+    if [[ -f "${PREFIX_TMP}-FLG_RSYNC_KERNEL" ]]; then
         echo "[DBG] SKIP rsync rootfs"
 
     else
         echo "Rsyncing kernel into image file"
         rsync_and_verify "${PARAM_DN_ROOTFS_KERNEL}/" ${DN_ROOT}/
-        touch "${PREFIX_TMP}-${pkgname}-FLG_RSYNC_KERNEL"
+        touch "${PREFIX_TMP}-FLG_RSYNC_KERNEL"
     fi
 
     # Enable login over serial
@@ -527,6 +527,30 @@ if [[ ! -f "${PREFIX_TMP}-${pkgname}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-${
 fi
 }
 
+my0_getpath () {
+  PARAM_DN="$1"
+  shift
+  #readlink -f
+  DN="${PARAM_DN}"
+  FN=
+  if [ ! -d "${DN}" ]; then
+    FN=$(basename "${DN}")
+    DN=$(dirname "${DN}")
+  fi
+  cd "${DN}" > /dev/null 2>&1
+  DN=$(pwd)
+  cd - > /dev/null 2>&1
+  echo "${DN}/${FN}"
+}
+
+check_valid_path() {
+    V=$(my0_getpath "$1")
+    if [[ "${V}" = "" || "${V}" = "/" ]]; then
+        echo "Error: not set path variable: $1"
+        exit 1
+    fi
+}
+
 my_setevn() {
     # setup environments
     MACHINE=${ARCHITECTURE}
@@ -565,6 +589,10 @@ my_setevn() {
         export CROSS_COMPILE=
         unset CROSS_COMPILE
     fi
+
+    check_valid_path "${DN_ROOTFS_KERNEL}"
+    check_valid_path "${DN_BOOT}"
+    check_valid_path "${DN_ROOTFS_DEBIAN}"
 }
 
 prepare_hardkernel_toolchains () {
