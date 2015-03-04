@@ -543,7 +543,7 @@ my0_getpath () {
   echo "${DN}/${FN}"
 }
 
-check_valid_path() {
+my0_check_valid_path() {
     V=$(my0_getpath "$1")
     if [[ "${V}" = "" || "${V}" = "/" ]]; then
         echo "Error: not set path variable: $1"
@@ -590,9 +590,9 @@ my_setevn() {
         unset CROSS_COMPILE
     fi
 
-    check_valid_path "${DN_ROOTFS_KERNEL}"
-    check_valid_path "${DN_BOOT}"
-    check_valid_path "${DN_ROOTFS_DEBIAN}"
+    my0_check_valid_path "${DN_ROOTFS_KERNEL}"
+    my0_check_valid_path "${DN_BOOT}"
+    my0_check_valid_path "${DN_ROOTFS_DEBIAN}"
 }
 
 prepare_hardkernel_toolchains () {
