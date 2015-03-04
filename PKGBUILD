@@ -142,7 +142,7 @@ kali_rootfs_debootstrap() {
     shift
 
     # the apt cache folder
-    DN_APT_CACHE="${SRCPKGDEST}/apt-cache-kali-${MACHINEARCH}"
+    DN_APT_CACHE="${srcdir}/apt-cache-kali-${MACHINEARCH}"
     mkdir -p "${DN_APT_CACHE}"
     mkdir -p "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
