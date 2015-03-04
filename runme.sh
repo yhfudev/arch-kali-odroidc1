@@ -8,17 +8,35 @@
 # License: GPL v3.0 or later
 #####################################################################
 
-ln -s ../arch-kali-rpi2/kali-wifi-injection-3.18.patch
-ln -s ../arch-kali-rpi2/librepo.sh
-ln -s ../arch-kali-rpi2/mkpkg.sh
-
 DN=$(pwd)
 
-cat << EOF > mymakepkg.conf
+EXEC_MKPKG="${DN}/makepkg.sh"
+
+#export GIT_SSL_NO_VERIFY=true
+
+check_install_tool() {
+    if [ ! -x "${EXEC_MKPKG}" ]; then
+        git clone https://github.com/yhfudev/bash-fakemakepkg.git "${DN}/fakemakepkg-git"
+        EXEC_MKPKG="${DN}/fakemakepkg-git/makepkg.sh"
+    fi
+    if [ ! -x "${EXEC_MKPKG}" ]; then
+        echo "error to get makepkg"
+        exit 1
+    fi
+    ( cd "${DN}/fakemakepkg-git" && git pull )
+}
+
+check_install_tool
+
+cat << EOF > "${DN}/mymakepkg.conf"
 PKGDEST=${DN}/pkg
 SRCDEST=${DN}/src
 SRCPKGDEST=${DN}/repo
 EOF
 
-./mkpkg.sh --config mymakepkg.conf -p PKGBUILD --dryrun
-./mkpkg.sh --config mymakepkg.conf -p PKGBUILD
+${EXEC_MKPKG} --config "${DN}/mymakepkg.conf" -p "${DN}/PKGBUILD" --dryrun
+if [ ! "$?" = "0" ]; then
+    echo "error in checking the script!"
+    exit 1
+fi
+${EXEC_MKPKG} --config "${DN}/mymakepkg.conf" -p "${DN}/PKGBUILD"
