@@ -284,8 +284,8 @@ EOF
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
         fi
-        sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
     fi
+    sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     cat << EOF > "${PREFIX_TMP}-aptlst"
 deb http://http.kali.org/kali kali main non-free contrib
@@ -295,6 +295,10 @@ deb-src http://http.kali.org/kali kali main non-free contrib
 deb-src http://security.kali.org/kali-security kali/updates main contrib non-free
 EOF
     sudo mv "${PREFIX_TMP}-aptlst" "${DN_ROOT}/etc/apt/sources.list"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move apt/sources.list"
+        exit 1
+    fi
 
     cat << EOF > "${PREFIX_TMP}-cln"
 #!/bin/bash
@@ -310,6 +314,10 @@ rm -f /usr/bin/qemu*
 EOF
     chmod +x "${PREFIX_TMP}-cln"
     sudo mv "${PREFIX_TMP}-cln" "${DN_ROOTFS_DEBIAN}/cleanup"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move script cleanup"
+        exit 1
+    fi
 
     sudo chroot "${DN_ROOTFS_DEBIAN}" /cleanup
 
