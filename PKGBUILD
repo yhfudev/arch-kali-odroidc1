@@ -269,10 +269,18 @@ EOF
         #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/"
         #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/pts"
         sudo mount -t proc proc "${DN_ROOTFS_DEBIAN}/proc"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in mount proc"
+            exit 1
+        fi
         sudo mount -o bind /dev/ "${DN_ROOTFS_DEBIAN}/dev/"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in mount dev"
+            exit 1
+        fi
         sudo mount -o bind /dev/pts "${DN_ROOTFS_DEBIAN}/dev/pts"
         if [ ! "$?" = "0" ]; then
-            echo "Error in mount /dev"
+            echo "Error in mount dev/pts"
             exit 1
         fi
 
@@ -321,24 +329,23 @@ EOF
             echo "Error in debootstrap stage 3"
             exit 1
         fi
-    fi
 
-    sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+        sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
-    cat << EOF > "${PREFIX_TMP}-aptlst"
+        cat << EOF > "${PREFIX_TMP}-aptlst"
 deb http://http.kali.org/kali kali main non-free contrib
 deb http://security.kali.org/kali-security kali/updates main contrib non-free
 
 deb-src http://http.kali.org/kali kali main non-free contrib
 deb-src http://security.kali.org/kali-security kali/updates main contrib non-free
 EOF
-    sudo mv "${PREFIX_TMP}-aptlst" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
-    if [ ! "$?" = "0" ]; then
-        echo "Error in move apt/sources.list"
-        exit 1
-    fi
+        sudo mv "${PREFIX_TMP}-aptlst" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in move apt/sources.list"
+            exit 1
+        fi
 
-    cat << EOF > "${PREFIX_TMP}-cln"
+        cat << EOF > "${PREFIX_TMP}-cln"
 #!/bin/bash
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:$PATH
 export DEBIAN_FRONTEND=noninteractive
@@ -350,23 +357,42 @@ rm -f /hs_err*
 rm -f /cleanup
 rm -f /usr/bin/qemu*
 EOF
-    chmod +x "${PREFIX_TMP}-cln"
-    sudo mv "${PREFIX_TMP}-cln" "${DN_ROOTFS_DEBIAN}/cleanup"
-    if [ ! "$?" = "0" ]; then
-        echo "Error in move script cleanup"
-        exit 1
+        chmod +x "${PREFIX_TMP}-cln"
+        sudo mv "${PREFIX_TMP}-cln" "${DN_ROOTFS_DEBIAN}/cleanup"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in move script cleanup"
+            exit 1
+        fi
+
+        sudo chroot "${DN_ROOTFS_DEBIAN}" /cleanup
+        if [ ! "$?" = "0" ]; then
+            echo "Error in chroot cleanup"
+            exit 1
+        fi
+
+        sudo umount "${DN_ROOTFS_DEBIAN}/proc/sys/fs/binfmt_misc"
+        #if [ ! "$?" = "0" ]; then
+            #echo "Error in unmount proc/sys/fs/binfmt_misc"
+            #exit 1
+        #fi
+        sudo umount "${DN_ROOTFS_DEBIAN}/dev/pts"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in unmount dev/pts"
+            exit 1
+        fi
+        sudo umount "${DN_ROOTFS_DEBIAN}/dev/"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in unmount dev"
+            exit 1
+        fi
+        sudo umount "${DN_ROOTFS_DEBIAN}/proc"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in unmount proc"
+            exit 1
+        fi
     fi
 
-    sudo chroot "${DN_ROOTFS_DEBIAN}" /cleanup
-
-    sudo umount "${DN_ROOTFS_DEBIAN}/proc/sys/fs/binfmt_misc"
-    sudo umount "${DN_ROOTFS_DEBIAN}/dev/pts"
-    sudo umount "${DN_ROOTFS_DEBIAN}/dev/"
-    sudo umount "${DN_ROOTFS_DEBIAN}/proc"
-    if [ ! "$?" = "0" ]; then
-        echo "Error in unmount /dev"
-        exit 1
-    fi
+    sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     if [ "${ISCROSS}" = "1" ]; then
         unregister_qemuarm
