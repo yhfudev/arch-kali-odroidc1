@@ -285,6 +285,15 @@ EOF
         sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
     fi
 
+    cat << EOF > /tmp/aptlst
+deb http://http.kali.org/kali kali main non-free contrib
+deb http://security.kali.org/kali-security kali/updates main contrib non-free
+
+deb-src http://http.kali.org/kali kali main non-free contrib
+deb-src http://security.kali.org/kali-security kali/updates main contrib non-free
+EOF
+    sudo mv /tmp/aptlst "${DN_ROOT}/etc/apt/sources.list"
+
     cat << EOF > /tmp/cln
 #!/bin/bash
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:$PATH
@@ -325,12 +334,12 @@ kali_rootfs_linuxkernel() {
     make -j $CORES modules
 
     # install kernel
-    make -j $CORES modules_install INSTALL_MOD_PATH=${DN_ROOTFS_RPI2}
+    make -j $CORES modules_install INSTALL_MOD_PATH=${DN_ROOTFS_KERNEL}
 
-    rm -rf ${DN_ROOTFS_RPI2}/lib/firmware
-    #git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git ${DN_ROOTFS_RPI2}/lib/firmware
-    cp -r ${srcdir}/firmware-linux-git ${DN_ROOTFS_RPI2}/lib/firmware
-    rm -rf ${DN_ROOTFS_RPI2}/lib/firmware/.git
+    rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware
+    #git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git ${DN_ROOTFS_KERNEL}/lib/firmware
+    cp -r ${srcdir}/firmware-linux-git ${DN_ROOTFS_KERNEL}/lib/firmware
+    rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware/.git
 
 if [ 0 = 0 ]; then
     make uImage
@@ -345,10 +354,10 @@ else
 dwc_otg.lpm_enable=0 console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 elevator=deadline root=/dev/mmcblk0p2 rootfstype=ext4 rootwait
 EOF
     # rpi-wiggle
-    mkdir -p ${DN_ROOTFS_RPI2}/scripts
-    #wget https://raw.github.com/dweeber/rpiwiggle/master/rpi-wiggle -O ${DN_ROOTFS_RPI2}/scripts/rpi-wiggle.sh
-    cp ${srcdir}/rpiwiggle-git/rpi-wiggle ${DN_ROOTFS_RPI2}/scripts/rpi-wiggle.sh
-    chmod 755 ${DN_ROOTFS_RPI2}/scripts/rpi-wiggle.sh
+    mkdir -p ${DN_ROOTFS_KERNEL}/scripts
+    #wget https://raw.github.com/dweeber/rpiwiggle/master/rpi-wiggle -O ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
+    cp ${srcdir}/rpiwiggle-git/rpi-wiggle ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
+    chmod 755 ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
 fi
 
 }
@@ -382,7 +391,7 @@ fi
 kali_create_image() {
     PARAM_DN_ROOTFS_DEBIAN="$1"
     shift
-    PARAM_DN_ROOTFS_RPI2="$1"
+    PARAM_DN_ROOTFS_KERNEL="$1"
     shift
 
     # Create the disk and partition it
@@ -419,7 +428,7 @@ kali_create_image() {
     sudo mkfs.ext4 -L root $rootp
 
     # Create the dirs for the partitions and mount them
-    DN_ROOT="${srcdir}/mntrootfs-${MACHINEARCH}"
+    DN_ROOT="${srcdir}/mntrootfs-${MACHINEARCH}-${pkgname}"
     mkdir -p ${DN_ROOT}
     sudo mount $rootp ${DN_ROOT}
 
@@ -431,19 +440,10 @@ kali_create_image() {
     rsync_and_verify "${PARAM_DN_ROOTFS_DEBIAN}/" ${DN_ROOT}/
 
     echo "Rsyncing kernel into image file"
-    rsync_and_verify "${PARAM_DN_ROOTFS_RPI2}/"   ${DN_ROOT}/
+    rsync_and_verify "${PARAM_DN_ROOTFS_KERNEL}/" ${DN_ROOT}/
 
     # Enable login over serial
     echo "echo 'T0:23:respawn:/sbin/agetty -L ttyAMA0 115200 vt100' >> ${DN_ROOT}/etc/inittab" | sudo sh
-
-    cat << EOF > /tmp/aptlst
-deb http://http.kali.org/kali kali main non-free contrib
-deb http://security.kali.org/kali-security kali/updates main contrib non-free
-
-deb-src http://http.kali.org/kali kali main non-free contrib
-deb-src http://security.kali.org/kali-security kali/updates main contrib non-free
-EOF
-    sudo mv /tmp/aptlst "${DN_ROOT}/etc/apt/sources.list"
 
     # Unmount partitions
     sudo umount ${DN_BOOT}
@@ -501,9 +501,9 @@ my_setevn() {
     export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
     export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
 
-    DN_ROOTFS_RPI2="${srcdir}/rootfs-odroidc1-${MACHINEARCH}"
-    DN_BOOT="${DN_ROOTFS_RPI2}/boot"
-    DN_ROOTFS_DEBIAN="${srcdir}/rootfs-kali-${MACHINEARCH}"
+    DN_ROOTFS_KERNEL="${srcdir}/rootfs-kernel-${MACHINEARCH}"
+    DN_BOOT="${DN_ROOTFS_KERNEL}/boot"
+    DN_ROOTFS_DEBIAN="${srcdir}/rootfs-kali-${MACHINEARCH}-${pkgname}"
 
     export ARCH=arm
     if [ "${ISCROSS}" = "1" ]; then
@@ -601,10 +601,10 @@ prepare() {
     rm -f "${FN_IMAGE}" ${PREFIX_TMP}*
 
     rm -rf ${DN_BOOT}
-    rm -rf ${DN_ROOTFS_RPI2}
+    rm -rf ${DN_ROOTFS_KERNEL}
     #rm -rf ${DN_ROOTFS_DEBIAN}
     mkdir -p ${DN_BOOT}
-    mkdir -p ${DN_ROOTFS_RPI2}
+    mkdir -p ${DN_ROOTFS_KERNEL}
     mkdir -p ${DN_ROOTFS_DEBIAN}
 
     prepare_hardkernel_toolchains
@@ -643,7 +643,7 @@ build() {
 package() {
     my_setevn
 
-    kali_create_image "${DN_ROOTFS_DEBIAN}" "${DN_ROOTFS_RPI2}"
+    kali_create_image "${DN_ROOTFS_DEBIAN}" "${DN_ROOTFS_KERNEL}"
 
     cd ${srcdir}
     #make DESTDIR="$pkgdir/" install
