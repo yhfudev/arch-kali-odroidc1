@@ -45,7 +45,7 @@ PATCH_CONFIG_KERNEL="odroidc1-kernel-config.patch"
 # image, keep that in mind.
 PACKAGES_ARM="abootimg cgpt fake-hwclock ntpdate vboot-utils vboot-kernel-utils uboot-mkimage"
 PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils"
-PACKAGES_DESKTOP="xfce4 network-manager network-manager-gnome xserver-xorg-video-fbdev"
+PACKAGES_DESKTOP="xfce4 xfce4-goodies network-manager network-manager-gnome xserver-xorg-video-fbdev"
 PACKAGES_TOOLS="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool"
 PACKAGES_SERVICES="openssh-server apache2"
 PACKAGES_EXTRAS="iceweasel wpasupplicant"
@@ -101,7 +101,7 @@ sha1sums=(
          )
 
 pkgver() {
-    cd "$srcdir/kali-arm-build-scripts-git"
+    cd "${srcdir}/kali-arm-build-scripts-git"
     local ver="$(git show | grep commit | awk '{print $2}'  )"
     #printf "r%s" "${ver//[[:alpha:]]}"
     echo ${ver:0:7}
@@ -199,11 +199,13 @@ kali_rootfs_debootstrap() {
 
     echo "[DBG] debootstrap state 2.5"
     # Create sources.list
-    cat << EOF > "${PREFIX_TMP}-list"
+    cat << EOF > "${PREFIX_TMP}-aptlst1"
 deb http://${INSTALL_MIRROR}/kali kali main contrib non-free
 deb http://${INSTALL_SECURITY}/kali-security kali/updates main contrib non-free
 EOF
-    sudo mv "${PREFIX_TMP}-list" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
+    chmod 644 "${PREFIX_TMP}-aptlst1"
+    sudo chown root:root "${PREFIX_TMP}-aptlst1"
+    sudo mv "${PREFIX_TMP}-aptlst1" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
     if [ ! "$?" = "0" ]; then
         echo "Error in move apt/sources.list"
         exit 1
@@ -222,6 +224,8 @@ ff00::0         ip6-mcastprefix
 ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
+    chmod 644 "${PREFIX_TMP}-host"
+    sudo chown root:root "${PREFIX_TMP}-host"
     sudo mv "${PREFIX_TMP}-host" "${DN_ROOTFS_DEBIAN}/etc/hosts"
     if [ ! "$?" = "0" ]; then
         echo "Error in move hosts"
@@ -240,6 +244,8 @@ EOF
     cat << EOF > "${PREFIX_TMP}-reso"
 nameserver 8.8.8.8
 EOF
+    chmod 644 "${PREFIX_TMP}-reso"
+    sudo chown root:root "${PREFIX_TMP}-reso"
     sudo mv "${PREFIX_TMP}-reso" "${DN_ROOTFS_DEBIAN}/etc/resolv.conf"
     if [ ! "$?" = "0" ]; then
         echo "Error in move resolv.conf"
@@ -254,6 +260,8 @@ EOF
 console-common console-data/keymap/policy select Select keymap from full list
 console-common console-data/keymap/full select en-latin1-nodeadkeys
 EOF
+    chmod 644 "${PREFIX_TMP}-deb"
+    sudo chown root:root "${PREFIX_TMP}-deb"
     sudo mv "${PREFIX_TMP}-deb" "${DN_ROOTFS_DEBIAN}/debconf.set"
     if [ ! "$?" = "0" ]; then
         echo "Error in move script debconf.set"
@@ -323,10 +331,8 @@ EOF
         fi
 
         sudo chroot "${DN_ROOTFS_DEBIAN}" /third-stage
-        if [ "$?" = "0" ]; then
-            touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
-        else
-            echo "Error in debootstrap stage 3"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in third-stage"
             exit 1
         fi
 
@@ -339,9 +345,11 @@ deb http://security.kali.org/kali-security kali/updates main contrib non-free
 deb-src http://http.kali.org/kali kali main non-free contrib
 deb-src http://security.kali.org/kali-security kali/updates main contrib non-free
 EOF
+        chmod 644 "${PREFIX_TMP}-aptlst"
+        sudo chown root:root "${PREFIX_TMP}-aptlst"
         sudo mv "${PREFIX_TMP}-aptlst" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
         if [ ! "$?" = "0" ]; then
-            echo "Error in move apt/sources.list"
+            echo "Error in move apt/sources.list final: ${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
             exit 1
         fi
 
@@ -390,6 +398,9 @@ EOF
             echo "Error in unmount proc"
             exit 1
         fi
+
+        sudo chown -R root:root "${DN_ROOTFS_DEBIAN}"
+        touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
     fi
 
     sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
@@ -420,8 +431,10 @@ kali_rootfs_linuxkernel() {
             exit 1
         fi
 
+        my0_check_valid_path "${DN_ROOTFS_KERNEL}"
+        sudo chown -R ${USER} "${DN_ROOTFS_KERNEL}"
         # install kernel
-        make -j $CORES modules_install INSTALL_MOD_PATH=${DN_ROOTFS_KERNEL}
+        make -j $CORES modules_install INSTALL_MOD_PATH="${DN_ROOTFS_KERNEL}"
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE"
         else
@@ -430,7 +443,10 @@ kali_rootfs_linuxkernel() {
         fi
     fi
 
-    rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware
+    my0_check_valid_path "${DN_ROOTFS_KERNEL}"
+    sudo mkdir -p "${DN_ROOTFS_KERNEL}/lib/"
+    sudo chown -R ${USER} "${DN_ROOTFS_KERNEL}/lib/"
+    sudo rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware
     #git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git ${DN_ROOTFS_KERNEL}/lib/firmware
     cp -r ${srcdir}/firmware-linux-git ${DN_ROOTFS_KERNEL}/lib/firmware
     rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware/.git
@@ -441,8 +457,12 @@ if [ 0 = 0 ]; then
     sudo cp arch/arm/boot/uImage arch/arm/boot/dts/meson8b_odroidc.dtb "${DN_BOOT}"
 
 else
+    my0_check_valid_path "${DN_ROOTFS_KERNEL}"
+    sudo mkdir -p "${DN_BOOT}"
+    sudo chown -R ${USER} "${DN_BOOT}"
     cp -rf ${srcdir}/firmware-raspberrypi-git/boot/* ${DN_BOOT}
-    cp arch/arm/boot/zImage ${DN_BOOT}/kernel.img
+
+    cp arch/arm/boot/zImage ${DN_BOOT}/${FN_RPI_KERNEL}
 
     cat << EOF > ${DN_BOOT}/cmdline.txt
 dwc_otg.lpm_enable=0 console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 elevator=deadline root=/dev/mmcblk0p2 rootfstype=ext4 rootwait
@@ -454,6 +474,7 @@ EOF
     chmod 755 ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
 fi
 
+    sudo chown -R root:root "${DN_ROOTFS_KERNEL}"
 }
 
 rsync_and_verify() {
@@ -597,12 +618,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         exit 1
     fi
 
-    # Clean up all the temporary build stuff and remove the directories.
-    # Comment this out to keep things around if you want to see what may have gone
-    # wrong.
-    #echo "Cleaning up the temporary build files..."
-    #rm -rf ${basedir}/kernel ${basedir}/bootp ${basedir}/root ${basedir}/kali-${MACHINEARCH} ${basedir}/boot ${basedir}/tools ${basedir}/patches
-
+if [ 0 = 1 ]; then
     # If you're building an image for yourself, comment all of this out, as you
     # don't need the sha1sum or to compress the image, since you will be testing it
     # soon.
@@ -619,6 +635,8 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
             (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
         fi
     fi
+fi
+
 fi
 }
 
@@ -720,11 +738,23 @@ prepare_hardkernel_kernel () {
     git checkout odroidc-3.10.y
 
     patch -p1 --no-backup-if-mismatch < ${srcdir}/${PATCH_MAC80211}
+    if [ ! "$?" = "0" ]; then
+        echo "error in patch ${PATCH_MAC80211}"
+        exit 1
+    fi
     touch .scmversion
 
+    make mrproper
     make odroidc_defconfig
     cp ${srcdir}/${CONFIG_KERNEL} .config
     patch -p0 --no-backup-if-mismatch < ${srcdir}/${PATCH_CONFIG_KERNEL}
+    if [ ! "$?" = "0" ]; then
+        echo "error in patch ${PATCH_CONFIG_KERNEL}"
+        exit 1
+    fi
+
+    make modules_prepare
+    #cp "${srcdir}/firmware-raspberrypi-git/extra/Module.symvers" . # copy Module.sysmvers to the linux directory
 }
 
 build_hardkernel_uboot () {
@@ -773,7 +803,7 @@ fi
 
 prepare() {
     my_setevn
-    rm -f "${FN_IMAGE}" ${PREFIX_TMP}*
+    #rm -f "${FN_IMAGE}" ${PREFIX_TMP}*
 
     rm -rf ${DN_BOOT}
     rm -rf ${DN_ROOTFS_KERNEL}
