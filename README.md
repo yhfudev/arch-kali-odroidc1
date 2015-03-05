@@ -1,7 +1,3 @@
-# 
-build scripts for Kali image of Odroid C1
-
-
 arch-kali-odroidc1
 ==============
 
