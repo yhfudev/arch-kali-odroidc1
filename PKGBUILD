@@ -361,6 +361,7 @@ export DEBIAN_FRONTEND=noninteractive
 rm -rf /root/.bash_history
 apt-get update
 apt-get clean
+rm -f /debconf.set
 rm -f /0
 rm -f /hs_err*
 rm -f /cleanup
@@ -424,7 +425,7 @@ kali_rootfs_linuxkernel() {
 
     else
         # compile linux kernel for Raspberry Pi 2
-        make clean
+        #make clean
         make -j $CORES
         make -j $CORES modules
         if [ ! "$?" = "0" ]; then
