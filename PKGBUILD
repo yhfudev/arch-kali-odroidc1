@@ -45,11 +45,12 @@ PATCH_CONFIG_KERNEL="odroidc1-kernel-config.patch"
 # image, keep that in mind.
 PACKAGES_ARM="abootimg cgpt fake-hwclock ntpdate vboot-utils vboot-kernel-utils uboot-mkimage"
 PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils"
-PACKAGES_DESKTOP="xfce4 xfce4-goodies network-manager network-manager-gnome xserver-xorg-video-fbdev"
+PACKAGES_DESKTOP="xfce4 network-manager network-manager-gnome xserver-xorg-video-fbdev"
 PACKAGES_TOOLS="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool"
 PACKAGES_SERVICES="openssh-server apache2"
 PACKAGES_EXTRAS="iceweasel wpasupplicant"
-export PACKAGES="${PACKAGES_ARM} ${PACKAGES_BASE} ${PACKAGES_DESKTOP} ${PACKAGES_TOOLS} ${PACKAGES_SERVICES} ${PACKAGES_EXTRAS}"
+#PACKAGES_ADDON="fruitywifi wifite xfce4-goodies"
+export PACKAGES="${PACKAGES_ARM} ${PACKAGES_BASE} ${PACKAGES_DESKTOP} ${PACKAGES_TOOLS} ${PACKAGES_SERVICES} ${PACKAGES_EXTRAS} ${PACKAGES_ADDON}"
 
 # the image container size
 IMGCONTAINER_SIZE=3000 # Size of image in megabytes
@@ -744,7 +745,7 @@ prepare_hardkernel_kernel () {
     fi
     touch .scmversion
 
-    make mrproper
+    #make mrproper
     make odroidc_defconfig
     cp ${srcdir}/${CONFIG_KERNEL} .config
     patch -p0 --no-backup-if-mismatch < ${srcdir}/${PATCH_CONFIG_KERNEL}
@@ -753,7 +754,7 @@ prepare_hardkernel_kernel () {
         exit 1
     fi
 
-    make modules_prepare
+    #make modules_prepare
     #cp "${srcdir}/firmware-raspberrypi-git/extra/Module.symvers" . # copy Module.sysmvers to the linux directory
 }
 
