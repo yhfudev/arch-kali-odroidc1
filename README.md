@@ -11,7 +11,7 @@ Build
 You may compile the kali image for Odroid C1 in one step:
 
     git clone https://github.com/yhfudev/arch-kali-odroidc1.git
-    cd arch-kali-rpi2
+    cd arch-kali-odroidc1
     ./runme.sh
 
 You may want to run above commands in a virtual machine by user root,
