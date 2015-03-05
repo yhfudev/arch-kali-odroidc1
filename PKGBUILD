@@ -425,11 +425,15 @@ kali_rootfs_linuxkernel() {
 
     else
         # compile linux kernel for Raspberry Pi 2
-        #make clean
+        make clean
         make -j $CORES
-        make -j $CORES modules
         if [ ! "$?" = "0" ]; then
             echo "Error in compiling linux kernel"
+            exit 1
+        fi
+        make -j $CORES modules
+        if [ ! "$?" = "0" ]; then
+            echo "Error in compiling linux kernel modules"
             exit 1
         fi
 
