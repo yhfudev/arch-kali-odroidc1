@@ -13,7 +13,7 @@ depends=(
 makedepends=(
     'pixz'
     'git' 'bc' 'gcc-libs' 'bash' 'ncurses'
-    'qemu' 'qemu-user-static' 'binfmt-support' # cross compile and chroot
+    'qemu' 'qemu-user-static-exp' 'binfmt-support' # cross compile and chroot
     'debootstrap' # to create debian rootfs
     'parted' 'dosfstools'
     'yaourt' 'multipath-tools' # for kpartx, in AUR, you need to use yaourt to install it
