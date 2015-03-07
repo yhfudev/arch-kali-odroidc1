@@ -12,14 +12,15 @@ depends=(
     )
 makedepends=(
     'pixz'
-    'git' 'bc' 'gcc-libs' 'bash' 'ncurses'
+    'git' 'bc' 'gcc-libs' 'bash'
+    'ncurses' 'lzop' 'uboot-tools' # for kernel
     'qemu' 'qemu-user-static-exp' 'binfmt-support' # cross compile and chroot
     'debootstrap' # to create debian rootfs
     'parted' 'dosfstools'
     'yaourt' 'multipath-tools' # for kpartx, in AUR, you need to use yaourt to install it
     'lib32-libstdc++5' 'lib32-zlib' # for 32 bit compiler
     'base-devel' 'abs' 'fakeroot'
-    # 'kernel-package' # debian packages
+    # 'kernel-package' # debian packages, include make-kpkg
     )
 #install="$pkgname.install"
 #PKGEXT=.pkg.tar.xz
@@ -274,9 +275,11 @@ EOF
         echo "[DBG] SKIP debootstrap state 3"
 
     else
+        #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/sys"
         #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/proc"
         #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/"
         #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/dev/pts"
+        sudo mount -o bind /sys/ "${DN_ROOTFS_DEBIAN}/sys/"
         sudo mount -t proc proc "${DN_ROOTFS_DEBIAN}/proc"
         if [ ! "$?" = "0" ]; then
             echo "Error in mount proc"
@@ -425,7 +428,7 @@ kali_rootfs_linuxkernel() {
 
     else
         # compile linux kernel for Raspberry Pi 2
-        make clean
+        #make clean
         make -j $CORES
         if [ ! "$?" = "0" ]; then
             echo "Error in compiling linux kernel"
@@ -460,7 +463,17 @@ kali_rootfs_linuxkernel() {
 if [ 0 = 0 ]; then
     make uImage
     make dtbs
-    sudo cp arch/arm/boot/uImage arch/arm/boot/dts/meson8b_odroidc.dtb "${DN_BOOT}"
+    sudo mkdir -p "${DN_BOOT}/dtbs/"
+    sudo cp arch/arm/boot/uImage "${DN_BOOT}/"
+    sudo cp arch/arm/boot/dts/meson8b_odroidc.dtb "${DN_BOOT}/dtbs/"
+
+    sudo cp "${srcdir}/boot.int.template"   "${DN_BOOT}/boot.int"
+
+    # use the serial in the 40pin slot
+    sudo sed -i 's|console=ttyS0|console=ttyS2|' "${DN_BOOT}/boot.int"
+
+    sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT}/"
+    sudo cp "${srcdir}/sd_fusing.sh"        "${DN_BOOT}/"
 
 else
     my0_check_valid_path "${DN_ROOTFS_KERNEL}"
@@ -613,6 +626,10 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
 
     # Enable login over serial
     echo "echo 'T0:23:respawn:/sbin/agetty -L ttyAMA0 115200 vt100' >> ${DN_ROOT}/etc/inittab" | sudo sh
+
+    # if use hdr, uncomment following
+    #ROOT_UUID=$(blkid $rootp | sed -n 's/.*UUID=\"\([^\"]*\)\".*/\1/p')
+    #sed -i -e "s/root=[^\w ]*/root=${ROOT_UUID}/" "${DN_BOOT}/boot.int"
 
     # Unmount partitions
     sudo umount ${DN_BOOT}
@@ -792,9 +809,19 @@ install_hardkernel_uboot () {
         exit 1
     fi
 
-if [ 0 = 1 ]; then
     BL1=${srcdir}/uboot-hardkernel-git/sd_fuse/bl1.bin.hardkernel
     UBOOT=${srcdir}/uboot-hardkernel-git/sd_fuse/u-boot.bin
+if [ 0 = 1 ]; then
+    if [ ! -f $BL1 ]; then
+        echo "Error: $BL1 does not exist."
+        exit 0
+    fi
+
+    if [ ! -f $UBOOT ]; then
+        echo "Error: $UBOOT does not exist."
+        exit 0
+    fi
+
     # install BL1/MBR
     sudo dd if=$BL1   of=${DEV_LOOP} bs=1 count=442
     sudo dd if=$BL1   of=${DEV_LOOP} bs=512 skip=1 seek=1
