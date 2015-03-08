@@ -34,7 +34,7 @@ PATCH_MAC80211="kali-arm-build-scripts-git/patches/kali-wifi-injection-3.12.patc
 #PATCH_MAC80211="kali-wifi-injection-3.18.patch"
 CONFIG_KERNEL="odroidc1-3.10.config"
 PATCH_CONFIG_KERNEL="odroidc1-kernel-config.patch"
-
+MAKE_CONFIG=odroidc_defconfig
 
 # Package installations for various sections.
 # This will build a minimal XFCE Kali system with the top 10 tools.
@@ -467,14 +467,6 @@ if [ 0 = 0 ]; then
     sudo cp arch/arm/boot/uImage "${DN_BOOT}/"
     sudo cp arch/arm/boot/dts/meson8b_odroidc.dtb "${DN_BOOT}/dtbs/"
 
-    sudo cp "${srcdir}/boot.int.template"   "${DN_BOOT}/boot.int"
-
-    # use the serial in the 40pin slot
-    sudo sed -i 's|console=ttyS0|console=ttyS2|' "${DN_BOOT}/boot.int"
-
-    sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT}/"
-    sudo cp "${srcdir}/sd_fusing.sh"        "${DN_BOOT}/"
-
 else
     my0_check_valid_path "${DN_ROOTFS_KERNEL}"
     sudo mkdir -p "${DN_BOOT}"
@@ -768,7 +760,7 @@ prepare_hardkernel_kernel () {
     touch .scmversion
 
     #make mrproper
-    make odroidc_defconfig
+    make ${MAKE_CONFIG}
     cp ${srcdir}/${CONFIG_KERNEL} .config
     patch -p0 --no-backup-if-mismatch < ${srcdir}/${PATCH_CONFIG_KERNEL}
     if [ ! "$?" = "0" ]; then
@@ -796,6 +788,14 @@ build_hardkernel_uboot () {
     echo "[DBG] PATH=${PATH}"
     make odroidc_config
     make
+
+    sudo cp "${srcdir}/boot.int.template"   "${DN_BOOT}/boot.int"
+    # use the serial in the 40pin slot
+    sudo sed -i 's|console=ttyS0|console=ttyS2|' "${DN_BOOT}/boot.int"
+
+    sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT}/"
+    sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/u-boot.bin"         "${DN_BOOT}/"
+    sudo cp "${srcdir}/sd_fusing.sh"                                    "${DN_BOOT}/"
 }
 
 install_hardkernel_uboot () {
