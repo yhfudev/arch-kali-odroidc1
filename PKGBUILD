@@ -409,6 +409,7 @@ EOF
             echo "Error in unmount proc"
             exit 1
         fi
+        sudo umount "${DN_ROOTFS_DEBIAN}/sys/"
 
         sudo chown -R root:root "${DN_ROOTFS_DEBIAN}"
         touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
