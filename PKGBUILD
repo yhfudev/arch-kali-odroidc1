@@ -726,6 +726,9 @@ my_setevn() {
         unset CROSS_COMPILE
     fi
 
+    mkdir -p "${DN_ROOTFS_KERNEL}"
+    mkdir -p "${DN_BOOT}"
+    mkdir -p "${DN_ROOTFS_DEBIAN}"
     my0_check_valid_path "${DN_ROOTFS_KERNEL}"
     my0_check_valid_path "${DN_BOOT}"
     my0_check_valid_path "${DN_ROOTFS_DEBIAN}"
