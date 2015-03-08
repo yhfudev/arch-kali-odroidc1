@@ -711,8 +711,10 @@ my_setevn() {
 
     export FN_IMAGE="${srcdir}/${pkgname}-${pkgver}-${MACHINEARCH}.img"
 
-    export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
-    export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
+    #export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
+    #export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
+    export DN_TOOLCHAIN_UBOOT="${srcdir}/"
+    export DN_TOOLCHAIN_KERNEL="${srcdir}/"
 
     DN_ROOTFS_KERNEL="${srcdir}/rootfs-kernel-${MACHINEARCH}-${pkgname}"
     DN_BOOT="${DN_ROOTFS_KERNEL}/boot"
@@ -737,13 +739,13 @@ my_setevn() {
 
 prepare_hardkernel_toolchains () {
     # 32bit compiler
-    echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
-    mkdir -p ${DN_TOOLCHAIN_UBOOT}
-    tar xf ${srcdir}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
+    #echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
+    #mkdir -p ${DN_TOOLCHAIN_UBOOT}
+    #tar xf ${srcdir}/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz -C ${DN_TOOLCHAIN_UBOOT}
 
-    echo "[DBG] create toolchain dir for kernel ..."
-    mkdir -p ${DN_TOOLCHAIN_KERNEL}
-    tar xf "${srcdir}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" -C "${DN_TOOLCHAIN_KERNEL}"
+    #echo "[DBG] create toolchain dir for kernel ..."
+    #mkdir -p ${DN_TOOLCHAIN_KERNEL}
+    #tar xf "${srcdir}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" -C "${DN_TOOLCHAIN_KERNEL}"
 }
 
 prepare_hardkernel_uboot () {
