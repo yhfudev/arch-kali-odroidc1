@@ -75,6 +75,8 @@ source=(
         # u-boot
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
         "uboot-hardkernel-git::git+https://github.com/hardkernel/u-boot.git"
+        "boot.ini.template"
+        "sd_fusing.sh"
         )
 
 md5sums=(
@@ -88,6 +90,8 @@ md5sums=(
          'a658e75a84cf9fe0874baad602049703'
          '12d6e8a0cbd2d8e130cc8f55389a95c3' # gcc for uboot
          'SKIP'
+         'f191e1ab6910983585ac877f17eed4e7'
+         'bb60369d23ba492e41524c9338f678c1'
          )
 sha1sums=(
          'SKIP'
@@ -100,6 +104,8 @@ sha1sums=(
          '125003dfdbef989b8e2cf1bc19cdac45df8742e1'
          '8069f484cfd5a7ea02d5bb74b56ae6c99e478d13'
          'SKIP'
+         '72dcfa52d9ec175eb7df5f5d80503e3432d6490c'
+         '79af8ab465eeb371e83b0b3670869f087040080b'
          )
 
 pkgver() {
@@ -430,7 +436,9 @@ kali_rootfs_linuxkernel() {
         # compile linux kernel for Raspberry Pi 2
         #make clean
         make -j $CORES
-        if [ ! "$?" = "0" ]; then
+        RET=$?
+        if [ ! "${RET}" = "0" ]; then
+            echo "compiling linux kernel return $RET"
             echo "Error in compiling linux kernel"
             exit 1
         fi
@@ -789,9 +797,9 @@ build_hardkernel_uboot () {
     make odroidc_config
     make
 
-    sudo cp "${srcdir}/boot.int.template"   "${DN_BOOT}/boot.int"
+    sudo cp "${srcdir}/boot.ini.template"   "${DN_BOOT}/boot.ini"
     # use the serial in the 40pin slot
-    sudo sed -i 's|console=ttyS0|console=ttyS2|' "${DN_BOOT}/boot.int"
+    sudo sed -i 's|console=ttyS0|console=ttyS2|' "${DN_BOOT}/boot.ini"
 
     sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT}/"
     sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/u-boot.bin"         "${DN_BOOT}/"
