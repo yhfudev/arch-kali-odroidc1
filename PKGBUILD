@@ -738,6 +738,7 @@ my_setevn() {
 }
 
 prepare_hardkernel_toolchains () {
+    echo "[DBG] in prepare_hardkernel_toolchains() ..."
     # 32bit compiler
     #echo "[DBG] prepare u-boot toolchain at ${DN_TOOLCHAIN_UBOOT} ..."
     #mkdir -p ${DN_TOOLCHAIN_UBOOT}
