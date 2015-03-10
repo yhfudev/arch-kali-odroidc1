@@ -63,9 +63,21 @@ IMGCONTAINER_SIZE=3000 # Size of image in megabytes
 export INSTALL_MIRROR=http.kali.org
 export INSTALL_SECURITY=security.kali.org
 
+
+USE_GIT_REPO=1
+
+GITCOMMIT_LINUX=c193f5d80656ce6d471cf3a28fe8259b3e3a02c0
+GITCOMMIT_UBOOT=e7d4447d551ccba5d60be8b11697aa0ab49086c4
+DNSRC_UBOOT=u-boot-${GITCOMMIT_UBOOT}
+DNSRC_LINUX=linux-${GITCOMMIT_LINUX}
+
+DNSRC_UBOOT=uboot-hardkernel-git
+DNSRC_LINUX=linux-hardkernel-git
+
+
 source=(
         "kali-arm-build-scripts-git::git+https://github.com/yhfudev/kali-arm-build-scripts.git"
-        "linux-hardkernel-git::git+https://github.com/hardkernel/linux.git" # kernel
+        "${DNSRC_LINUX}::git+https://github.com/hardkernel/linux.git" # "https://github.com/hardkernel/linux/archive/${GITCOMMIT_LINUX}.tar.gz"
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" #http://releases.linaro.org/14.09/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz
         "firmware-linux-git::git+https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
         "kali-wifi-injection-3.18.patch" #"mac80211.patch::https://raw.github.com/offensive-security/kali-arm-build-scripts/master/patches/kali-wifi-injection-3.12.patch"
@@ -74,7 +86,7 @@ source=(
 
         # u-boot
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
-        "uboot-hardkernel-git::git+https://github.com/hardkernel/u-boot.git"
+        "${DNSRC_UBOOT}::git+https://github.com/hardkernel/u-boot.git" #"https://github.com/hardkernel/u-boot/archive/${GITCOMMIT_UBOOT}.tar.gz"
         "boot.ini.template"
         "sd_fusing.sh"
         )
@@ -178,7 +190,7 @@ kali_rootfs_debootstrap() {
     else
         # create the rootfs - not much to modify here, except maybe the hostname.
         echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
-        sudo debootstrap --foreign --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
+        sudo debootstrap --foreign --no-check-gpg --include=ca-certificates,ssh,vim,locales,ntpdate,usbmount,initramfs-tools --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1"
         else
@@ -188,7 +200,7 @@ kali_rootfs_debootstrap() {
     fi
 
     if [ "${ISCROSS}" = "1" ]; then
-        sudo cp /usr/bin/qemu-arm-static "${DN_ROOTFS_DEBIAN}/usr/bin/"
+        sudo cp `which qemu-arm-static` "${DN_ROOTFS_DEBIAN}/usr/bin/"
     fi
 
     echo "[DBG] debootstrap state 2"
@@ -206,6 +218,9 @@ kali_rootfs_debootstrap() {
     fi
 
     echo "[DBG] debootstrap state 2.5"
+    sudo rm "${DN_ROOTFS_DEBIAN}/etc/hostname"
+    sudo rm ${DN_ROOTFS_DEBIAN}/etc/ssh/ssh_host_*
+
     # Create sources.list
     cat << EOF > "${PREFIX_TMP}-aptlst1"
 deb http://${INSTALL_MIRROR}/kali kali main contrib non-free
@@ -750,22 +765,26 @@ prepare_hardkernel_toolchains () {
 }
 
 prepare_hardkernel_uboot () {
-    echo "[DBG] cd ${srcdir}/uboot-hardkernel-git ..."
-    cd "${srcdir}/uboot-hardkernel-git"
-    git checkout odroidc-v2011.03
-    if [ ! "$?" = "0" ]; then
-        echo "Error in git"
-        exit 1
+    echo "[DBG] cd ${srcdir}/${DNSRC_UBOOT} ..."
+    cd "${srcdir}/${DNSRC_UBOOT}"
+    if [ "${USE_GIT_REPO}" = "1" ]; then
+        git checkout odroidc-v2011.03
+        if [ ! "$?" = "0" ]; then
+            echo "Error in git"
+            exit 1
+        fi
     fi
 }
 
 prepare_hardkernel_kernel () {
     # linux kernel for odroid
-    cd "${srcdir}/linux-hardkernel-git"
-    git submodule init
-    git submodule update
-    git pull --all
-    git checkout odroidc-3.10.y
+    cd "${srcdir}/${DNSRC_LINUX}"
+    if [ "${USE_GIT_REPO}" = "1" ]; then
+        git submodule init
+        git submodule update
+        git pull --all
+        git checkout odroidc-3.10.y
+    fi
 
     patch -p1 --no-backup-if-mismatch < ${srcdir}/${PATCH_MAC80211}
     if [ ! "$?" = "0" ]; then
@@ -788,7 +807,7 @@ prepare_hardkernel_kernel () {
 }
 
 build_hardkernel_uboot () {
-    cd ${srcdir}/uboot-hardkernel-git
+    cd "${srcdir}/${DNSRC_UBOOT}"
 
     export ARCH=arm
     if [ "${ISCROSS}" = "1" ]; then
@@ -806,10 +825,12 @@ build_hardkernel_uboot () {
 
     sudo cp "${srcdir}/boot.ini.template"   "${DN_BOOT}/boot.ini"
     # use the serial in the 40pin slot
-    sudo sed -i 's|console=ttyS0|console=ttyS2|' "${DN_BOOT}/boot.ini"
+    sudo sed -i -e 's|console=ttyS0|console=ttyS2|' \
+        -e 's|root=/dev/mmcblk0p1|root=/dev/mmcblk0p2|' \
+        "${DN_BOOT}/boot.ini"
 
-    sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT}/"
-    sudo cp "${srcdir}/uboot-hardkernel-git/sd_fuse/u-boot.bin"         "${DN_BOOT}/"
+    sudo cp "${srcdir}/${DNSRC_UBOOT}/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT}/"
+    sudo cp "${srcdir}/${DNSRC_UBOOT}/sd_fuse/u-boot.bin"         "${DN_BOOT}/"
     sudo cp "${srcdir}/sd_fusing.sh"                                    "${DN_BOOT}/"
 }
 
@@ -824,8 +845,8 @@ install_hardkernel_uboot () {
         exit 1
     fi
 
-    BL1=${srcdir}/uboot-hardkernel-git/sd_fuse/bl1.bin.hardkernel
-    UBOOT=${srcdir}/uboot-hardkernel-git/sd_fuse/u-boot.bin
+    BL1=${srcdir}/${DNSRC_UBOOT}/sd_fuse/bl1.bin.hardkernel
+    UBOOT=${srcdir}/${DNSRC_UBOOT}/sd_fuse/u-boot.bin
 if [ 0 = 1 ]; then
     if [ ! -f $BL1 ]; then
         echo "Error: $BL1 does not exist."
@@ -843,7 +864,7 @@ if [ 0 = 1 ]; then
     # install u-boot:
     sudo dd if=$UBOOT of=${DEV_LOOP} bs=512 seek=64
 else
-    ( cd ${srcdir}/uboot-hardkernel-git/sd_fuse && sh sd_fusing.sh ${DEV_LOOP} )
+    ( cd ${srcdir}/${DNSRC_UBOOT}/sd_fuse && sh sd_fusing.sh ${DEV_LOOP} )
 fi
 
     sudo losetup -d ${DEV_LOOP}
@@ -888,7 +909,7 @@ build() {
         unset CROSS_COMPILE
     fi
     echo "Build Linux kernel ..."
-    cd "${srcdir}/linux-hardkernel-git"
+    cd "${srcdir}/${DNSRC_LINUX}"
     kali_rootfs_linuxkernel
     echo "Build Linux kernel DONE!"
 }
