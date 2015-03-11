@@ -641,7 +641,11 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
     fi
 
     # Enable login over serial
+if [ 0 = 1 ]; then
     echo "echo 'T0:23:respawn:/sbin/agetty -L ttyAMA0 115200 vt100' >> ${DN_ROOT}/etc/inittab" | sudo sh
+else
+    echo "echo 'T0:123:respawn:/sbin/getty -L ttyS0 115200 vt100' >> ${DN_ROOT}/etc/inittab" | sudo sh
+fi
 
     # if use hdr, uncomment following
     #ROOT_UUID=$(blkid $rootp | sed -n 's/.*UUID=\"\([^\"]*\)\".*/\1/p')
@@ -825,7 +829,11 @@ build_hardkernel_uboot () {
 
     sudo cp "${srcdir}/boot.ini.template"   "${DN_BOOT}/boot.ini"
     # use the serial in the 40pin slot
-    sudo sed -i -e 's|console=ttyS0|console=ttyS2|' \
+    #-e 's|console=ttyS0|console=ttyS2|'
+
+    #sed -i 's|^\(setenv vout_mode .*\)$|#\1|' "${DN_BOOT}/boot.ini"
+    #sed -i 's|^#[\w ]*\(setenv vout_mode "dvi".*\)$|\1|' "${DN_BOOT}/boot.ini"
+    sudo sed -i \
         -e 's|root=/dev/mmcblk0p1|root=/dev/mmcblk0p2|' \
         "${DN_BOOT}/boot.ini"
 
