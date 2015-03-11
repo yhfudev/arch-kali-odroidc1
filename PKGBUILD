@@ -64,14 +64,15 @@ export INSTALL_MIRROR=http.kali.org
 export INSTALL_SECURITY=security.kali.org
 
 
-USE_GIT_REPO=1
+DNSRC_UBOOT_HARDKERNEL=uboot-hardkernel-git
+GITCOMMIT_UBOOT_HARDKERNEL=e7d4447d551ccba5d60be8b11697aa0ab49086c4
 
 GITCOMMIT_LINUX=c193f5d80656ce6d471cf3a28fe8259b3e3a02c0
-GITCOMMIT_UBOOT=e7d4447d551ccba5d60be8b11697aa0ab49086c4
-DNSRC_UBOOT=u-boot-${GITCOMMIT_UBOOT}
+GITCOMMIT_UBOOT=${GITCOMMIT_UBOOT_HARDKERNEL}
 DNSRC_LINUX=linux-${GITCOMMIT_LINUX}
-
-DNSRC_UBOOT=uboot-hardkernel-git
+DNSRC_UBOOT=u-boot-${GITCOMMIT_UBOOT}
+USE_GIT_REPO=1
+DNSRC_UBOOT=${DNSRC_UBOOT_HARDKERNEL}
 DNSRC_LINUX=linux-hardkernel-git
 
 
@@ -86,7 +87,7 @@ source=(
 
         # u-boot
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
-        "${DNSRC_UBOOT}::git+https://github.com/hardkernel/u-boot.git" #"https://github.com/hardkernel/u-boot/archive/${GITCOMMIT_UBOOT}.tar.gz"
+        "${DNSRC_UBOOT_HARDKERNEL}::git+https://github.com/hardkernel/u-boot.git" #"https://github.com/hardkernel/u-boot/archive/${GITCOMMIT_UBOOT_HARDKERNEL}.tar.gz"
         "boot.ini.template"
         "sd_fusing.sh"
         )
@@ -230,7 +231,7 @@ EOF
     sudo chown root:root "${PREFIX_TMP}-aptlst1"
     sudo mv "${PREFIX_TMP}-aptlst1" "${DN_ROOTFS_DEBIAN}/etc/apt/sources.list"
     if [ ! "$?" = "0" ]; then
-        echo "Error in move apt/sources.list"
+        echo "Error in move apt/sources.list 2.5"
         exit 1
     fi
 
@@ -288,6 +289,18 @@ EOF
     sudo mv "${PREFIX_TMP}-deb" "${DN_ROOTFS_DEBIAN}/debconf.set"
     if [ ! "$?" = "0" ]; then
         echo "Error in move script debconf.set"
+        exit 1
+    fi
+
+cat << EOF > "${PREFIX_TMP}-fstab"
+/dev/mmcblk0p2 / auto errors=remount-ro 0 1
+/dev/mmcblk0p1 /boot auto defaults 0 0
+EOF
+    chmod 644 "${PREFIX_TMP}-fstab"
+    sudo chown root:root "${PREFIX_TMP}-fstab"
+    sudo mv "${PREFIX_TMP}-fstab" "${DN_ROOTFS_DEBIAN}/etc/fstab"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move etc/fstab"
         exit 1
     fi
 
@@ -440,25 +453,20 @@ EOF
 kali_rootfs_linuxkernel() {
     # compile and install linux kernel for Raspberry Pi 2, install rpi2 specified tools
 
-    CORES=$(grep -c processor /proc/cpuinfo)
-    if [ "$CORES" = "" ]; then
-        CORES=2
-    fi
-
     if [[ -f "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE" ]]; then
         echo "[DBG] SKIP compile kernel core"
 
     else
         # compile linux kernel for Raspberry Pi 2
         #make clean
-        make -j $CORES
+        make -j $MACHINECORES
         RET=$?
         if [ ! "${RET}" = "0" ]; then
             echo "compiling linux kernel return $RET"
             echo "Error in compiling linux kernel"
             exit 1
         fi
-        make -j $CORES modules
+        make -j $MACHINECORES modules
         if [ ! "$?" = "0" ]; then
             echo "Error in compiling linux kernel modules"
             exit 1
@@ -467,7 +475,7 @@ kali_rootfs_linuxkernel() {
         my0_check_valid_path "${DN_ROOTFS_KERNEL}"
         sudo chown -R ${USER} "${DN_ROOTFS_KERNEL}"
         # install kernel
-        make -j $CORES modules_install INSTALL_MOD_PATH="${DN_ROOTFS_KERNEL}"
+        make -j $MACHINECORES modules_install INSTALL_MOD_PATH="${DN_ROOTFS_KERNEL}"
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE"
         else
@@ -580,6 +588,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         echo "Error in loop device"
         exit 1
     fi
+    #partprobe "${DEV_LOOP}" # to get /dev/loop0p1 ...
     bootp="/dev/mapper/${LOOPNAME}p1"
     rootp="/dev/mapper/${LOOPNAME}p2"
 
@@ -728,6 +737,11 @@ my_setevn() {
     esac
     export MACHINEARCH="${MACHINE}"
 
+    MACHINECORES=$(grep -c processor /proc/cpuinfo)
+    if [ "$MACHINECORES" = "" ]; then
+        MACHINECORES=2
+    fi
+
     export FN_IMAGE="${srcdir}/${pkgname}-${pkgver}-${MACHINEARCH}.img"
 
     #export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
@@ -798,8 +812,8 @@ prepare_hardkernel_kernel () {
     touch .scmversion
 
     #make mrproper
-    make ${MAKE_CONFIG}
-    cp ${srcdir}/${CONFIG_KERNEL} .config
+    make ${MAKE_CONFIG} # generate .config
+    cp ${srcdir}/${CONFIG_KERNEL} .config # or use ours
     patch -p0 --no-backup-if-mismatch < ${srcdir}/${PATCH_CONFIG_KERNEL}
     if [ ! "$?" = "0" ]; then
         echo "error in patch ${PATCH_CONFIG_KERNEL}"
@@ -824,8 +838,8 @@ build_hardkernel_uboot () {
     fi
 
     echo "[DBG] PATH=${PATH}"
-    make odroidc_config
-    make
+    make -j $MACHINECORES odroidc_config
+    make -j $MACHINECORES
 
     sudo cp "${srcdir}/boot.ini.template"   "${DN_BOOT}/boot.ini"
     # use the serial in the 40pin slot
