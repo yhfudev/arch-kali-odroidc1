@@ -7,11 +7,13 @@ pkgdesc="Odroid C1 Kali image"
 arch=('i686' 'x86_64' 'arm')
 url="https://github.com/yhfudev/arch-kali-odroidc1.git"
 license=('GPL')
-depends=(
+
+optdepends=(
     'pixz'
+    'bmap-tools'
     )
+
 makedepends=(
-    'pixz'
     'git' 'bc' 'gcc-libs' 'bash'
     'ncurses' 'lzop' 'uboot-tools' # for kernel
     'qemu' 'qemu-user-static-exp' 'binfmt-support' # cross compile and chroot
@@ -62,6 +64,13 @@ IMGCONTAINER_SIZE=3000 # Size of image in megabytes
 # After generating the rootfs, we set the sources.list to the default settings.
 export INSTALL_MIRROR=http.kali.org
 export INSTALL_SECURITY=security.kali.org
+
+# the /boot path for u-boot
+MNTPOINT_BOOT_FIRMWARE=/boot/firmware/
+# the root fs / label
+DISKLABEL_ROOTFS=rootfs
+# the /boot fs label
+DISKLABEL_BOOTFS=BOOTFS
 
 
 DNSRC_UBOOT_HARDKERNEL=uboot-hardkernel-git
@@ -293,8 +302,12 @@ EOF
     fi
 
 cat << EOF > "${PREFIX_TMP}-fstab"
-/dev/mmcblk0p2 / auto errors=remount-ro 0 1
-/dev/mmcblk0p1 /boot auto defaults 0 0
+LABEL=${DISKLABEL_ROOTFS}   /           auto    defaults,noatime,nodiratime,errors=remount-ro  0       1
+LABEL=${DISKLABEL_BOOTFS}   ${MNTPOINT_BOOT_FIRMWARE}  auto    defaults,ro,owner,flush,umask=000        0       2
+
+tmpfs           /tmp        tmpfs   nodev,nosuid,size=10%,mode=1777     0       0
+#tmpfs           /var/log    tmpfs   nodev,nosuid,size=20%,mode=1755     0       0
+proc            /proc       proc    defaults                            0       0
 EOF
     chmod 644 "${PREFIX_TMP}-fstab"
     sudo chown root:root "${PREFIX_TMP}-fstab"
@@ -303,6 +316,8 @@ EOF
         echo "Error in move etc/fstab"
         exit 1
     fi
+    # Stop the boot-sequence whinging about /tmp being read-only before /tmp is mounted:
+    touch "${DN_ROOTFS_DEBIAN}/tmp/.tmpfs"
 
     echo "[DBG] debootstrap state 3"
     if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3" ]]; then
@@ -345,10 +360,19 @@ apt-get --yes --force-yes install locales-all
 
 debconf-set-selections /debconf.set
 rm -f /debconf.set
+
+locale-gen en_EN en_EN.UTF-8 en_EN ISO-8859-1
+update-locale LANG="en_EN.UTF-8" LANGUAGE="en_EN" LC_ALL="en_EN.UTF-8"
+dpkg-reconfigure tzdata
+dpkg-reconfigure locales
+
 apt-get update
 apt-get --yes --force-yes install git-core binutils ca-certificates initramfs-tools uboot-mkimage
 apt-get --yes --force-yes install locales console-common less nano git
+
 echo "root:toor" | chpasswd
+#USER1=pi ; useradd -m -s /bin/bash -G adm,sudo,plugdev,audio,video,cdrom,floppy,dip \${USER1} && echo "\${USER1}:\${USER1}" | chpasswd
+
 sed -i -e 's/KERNEL\!=\"eth\*|/KERNEL\!=\"/' /lib/udev/rules.d/75-persistent-net-generator.rules
 rm -f /etc/udev/rules.d/70-persistent-net.rules
 apt-get --yes --force-yes install $PACKAGES
@@ -358,6 +382,8 @@ update-rc.d ssh enable
 rm -f /usr/sbin/policy-rc.d
 rm -f /usr/sbin/invoke-rc.d
 dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
+
+
 
 rm -f /third-stage
 EOF
@@ -374,6 +400,7 @@ EOF
             exit 1
         fi
 
+        # unmount the cache folder befor clean up, we may reuse the cache for other builds.
         sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
         cat << EOF > "${PREFIX_TMP}-aptlst"
@@ -398,6 +425,8 @@ export DEBIAN_FRONTEND=noninteractive
 rm -rf /root/.bash_history
 apt-get update
 apt-get clean
+/etc/init.d/dbus stop
+/etc/init.d/ssh  stop
 rm -f /debconf.set
 rm -f /0
 rm -f /hs_err*
@@ -416,6 +445,7 @@ EOF
             echo "Error in chroot cleanup"
             exit 1
         fi
+        sudo rm -f "${DN_ROOTFS_DEBIAN}/usr/bin/qemu*"
 
         sudo umount "${DN_ROOTFS_DEBIAN}/proc/sys/fs/binfmt_misc"
         #if [ ! "$?" = "0" ]; then
@@ -443,6 +473,7 @@ EOF
         touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
     fi
 
+    # make sure it umounted
     sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     if [ "${ISCROSS}" = "1" ]; then
@@ -495,19 +526,19 @@ kali_rootfs_linuxkernel() {
 if [ 0 = 0 ]; then
     make uImage
     make dtbs
-    sudo mkdir -p "${DN_BOOT}/dtbs/"
-    sudo cp arch/arm/boot/uImage "${DN_BOOT}/"
-    sudo cp arch/arm/boot/dts/meson8b_odroidc.dtb "${DN_BOOT}/dtbs/"
+    sudo mkdir -p "${DN_BOOT_4KERNEL}/dtbs/"
+    sudo cp arch/arm/boot/uImage "${DN_BOOT_4KERNEL}/"
+    sudo cp arch/arm/boot/dts/meson8b_odroidc.dtb "${DN_BOOT_4KERNEL}/dtbs/"
 
 else
     my0_check_valid_path "${DN_ROOTFS_KERNEL}"
-    sudo mkdir -p "${DN_BOOT}"
-    sudo chown -R ${USER} "${DN_BOOT}"
-    cp -rf ${srcdir}/firmware-raspberrypi-git/boot/* ${DN_BOOT}
+    sudo mkdir -p "${DN_BOOT_4KERNEL}"
+    sudo chown -R ${USER} "${DN_BOOT_4KERNEL}"
+    cp -rf ${srcdir}/firmware-raspberrypi-git/boot/* ${DN_BOOT_4KERNEL}
 
-    cp arch/arm/boot/zImage ${DN_BOOT}/${FN_RPI_KERNEL}
+    cp arch/arm/boot/zImage ${DN_BOOT_4KERNEL}/${FN_RPI_KERNEL}
 
-    cat << EOF > ${DN_BOOT}/cmdline.txt
+    cat << EOF > ${DN_BOOT_4KERNEL}/cmdline.txt
 dwc_otg.lpm_enable=0 console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 elevator=deadline root=/dev/mmcblk0p2 rootfstype=ext4 rootwait
 EOF
     # rpi-wiggle
@@ -526,7 +557,9 @@ rsync_and_verify() {
     PARAM_DN_DST="$1"
     shift
 
-    sudo rsync -HPavz -q "${PARAM_DN_SRC}" "${PARAM_DN_DST}"
+    OPTS_OTHER="--devices --specials --acls --xattrs --sparse"
+
+    sudo rsync -HPavz ${OPTS_OTHER} -q "${PARAM_DN_SRC}" "${PARAM_DN_DST}"
 
 if [ 1 = 0 ]; then
     # verify the files
@@ -597,12 +630,12 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
 
     else
         echo "Create file systems"
-        sudo mkfs.vfat -n boot $bootp
+        sudo mkfs.vfat -n ${DISKLABEL_BOOTFS} $bootp
         if [ ! "$?" = "0" ]; then
             echo "error in format boot"
             exit 1
         fi
-        sudo mkfs.ext4 -L root $rootp
+        sudo mkfs.ext4 -F -O ^has_journal -E stride=2,stripe-width=1024 -b 4096 -L ${DISKLABEL_ROOTFS} $rootp
         if [ ! "$?" = "0" ]; then
             echo "error in format root"
             exit 1
@@ -619,13 +652,13 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         exit 1
     fi
 
-    DN_BOOT=${DN_ROOT}/boot
-    sudo mkdir -p ${DN_BOOT}
+    DN_BOOT_4IMAGE="${DN_ROOT}${MNTPOINT_BOOT_FIRMWARE}"
+    sudo mkdir -p ${DN_BOOT_4IMAGE}
     if [ ! "$?" = "0" ]; then
-        echo "error in mkdir ${DN_ROOT}"
+        echo "error in mkdir ${DN_BOOT_4IMAGE}"
         exit 1
     fi
-    sudo mount $bootp ${DN_BOOT}
+    sudo mount $bootp ${DN_BOOT_4IMAGE}
     if [ ! "$?" = "0" ]; then
         echo "error in mount boot"
         exit 1
@@ -658,10 +691,10 @@ fi
 
     # if use hdr, uncomment following
     #ROOT_UUID=$(blkid $rootp | sed -n 's/.*UUID=\"\([^\"]*\)\".*/\1/p')
-    #sed -i -e "s/root=[^\w ]*/root=${ROOT_UUID}/" "${DN_BOOT}/boot.int"
+    #sed -i -e "s/root=[^\w ]*/root=${ROOT_UUID}/" "${DN_BOOT_4IMAGE}/boot.int"
 
     # Unmount partitions
-    sudo umount ${DN_BOOT}
+    sudo umount ${DN_BOOT_4IMAGE}
     sudo umount ${DN_ROOT}
     sudo kpartx -dv ${DEV_LOOP}
     sudo losetup -d ${DEV_LOOP}
@@ -670,24 +703,26 @@ fi
         exit 1
     fi
 
-if [ 0 = 1 ]; then
     # If you're building an image for yourself, comment all of this out, as you
     # don't need the sha1sum or to compress the image, since you will be testing it
     # soon.
     echo "Generating sha1sum for ${FN_IMAGE}"
     (cd $(dirname ${FN_IMAGE}) && sha1sum $(basename ${FN_IMAGE}) > ${FN_IMAGE}.sha1sum)
-    # Don't pixz on 32bit, there isn't enough memory to compress the images.
-    MACHINE_TYPE=$(uname -m)
-    if [ ${MACHINE_TYPE} == 'x86_64' ]; then
-        echo "Compressing ${FN_IMAGE}"
-        pixz ${FN_IMAGE} ${FN_IMAGE}.xz
-        if [ "$?" = "0" ]; then
-            rm -f ${FN_IMAGE}
-            echo "Generating sha1sum for ${FN_IMAGE}.xz"
-            (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
+    if which bmaptool; then
+        bmaptool create -o ${FN_IMAGE}.bmap ${FN_IMAGE}
+    else if which pixz; then
+        # Don't pixz on 32bit, there isn't enough memory to compress the images.
+        HW=$(uname -m)
+        if [ ${HW} == 'x86_64' ]; then
+            echo "Compressing ${FN_IMAGE}"
+            pixz ${FN_IMAGE} ${FN_IMAGE}.xz
+            if [ "$?" = "0" ]; then
+                rm -f ${FN_IMAGE}
+                echo "Generating sha1sum for ${FN_IMAGE}.xz"
+                (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
+            fi
         fi
-    fi
-fi
+    fi fi
 
 fi
 }
@@ -750,7 +785,7 @@ my_setevn() {
     export DN_TOOLCHAIN_KERNEL="${srcdir}/"
 
     DN_ROOTFS_KERNEL="${srcdir}/rootfs-kernel-${MACHINEARCH}-${pkgname}"
-    DN_BOOT="${DN_ROOTFS_KERNEL}/boot"
+    DN_BOOT_4KERNEL="${DN_ROOTFS_KERNEL}${MNTPOINT_BOOT_FIRMWARE}"
     DN_ROOTFS_DEBIAN="${srcdir}/rootfs-kali-${MACHINEARCH}-${pkgname}"
 
     export ARCH=arm
@@ -763,10 +798,10 @@ my_setevn() {
     fi
 
     mkdir -p "${DN_ROOTFS_KERNEL}"
-    mkdir -p "${DN_BOOT}"
+    mkdir -p "${DN_BOOT_4KERNEL}"
     mkdir -p "${DN_ROOTFS_DEBIAN}"
     my0_check_valid_path "${DN_ROOTFS_KERNEL}"
-    my0_check_valid_path "${DN_BOOT}"
+    my0_check_valid_path "${DN_BOOT_4KERNEL}"
     my0_check_valid_path "${DN_ROOTFS_DEBIAN}"
 }
 
@@ -841,19 +876,19 @@ build_hardkernel_uboot () {
     make -j $MACHINECORES odroidc_config
     make -j $MACHINECORES
 
-    sudo cp "${srcdir}/boot.ini.template"   "${DN_BOOT}/boot.ini"
+    sudo cp "${srcdir}/boot.ini.template"   "${DN_BOOT_4KERNEL}/boot.ini"
     # use the serial in the 40pin slot
     #-e 's|console=ttyS0|console=ttyS2|'
 
-    #sed -i 's|^\(setenv vout_mode .*\)$|#\1|' "${DN_BOOT}/boot.ini"
-    #sed -i 's|^#[\w ]*\(setenv vout_mode "dvi".*\)$|\1|' "${DN_BOOT}/boot.ini"
+    #sed -i 's|^\(setenv vout_mode .*\)$|#\1|' "${DN_BOOT_4KERNEL}/boot.ini"
+    #sed -i 's|^#[\w ]*\(setenv vout_mode "dvi".*\)$|\1|' "${DN_BOOT_4KERNEL}/boot.ini"
     sudo sed -i \
         -e 's|root=/dev/mmcblk0p1|root=/dev/mmcblk0p2|' \
-        "${DN_BOOT}/boot.ini"
+        "${DN_BOOT_4KERNEL}/boot.ini"
 
-    sudo cp "${srcdir}/${DNSRC_UBOOT}/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT}/"
-    sudo cp "${srcdir}/${DNSRC_UBOOT}/sd_fuse/u-boot.bin"         "${DN_BOOT}/"
-    sudo cp "${srcdir}/sd_fusing.sh"                                    "${DN_BOOT}/"
+    sudo cp "${srcdir}/${DNSRC_UBOOT}/sd_fuse/bl1.bin.hardkernel" "${DN_BOOT_4KERNEL}/"
+    sudo cp "${srcdir}/${DNSRC_UBOOT}/sd_fuse/u-boot.bin"         "${DN_BOOT_4KERNEL}/"
+    sudo cp "${srcdir}/sd_fusing.sh"                              "${DN_BOOT_4KERNEL}/"
 }
 
 install_hardkernel_uboot () {
@@ -892,14 +927,71 @@ fi
     sudo losetup -d ${DEV_LOOP}
 }
 
+prepare_hardkernel_rootfs () {
+    # addtional setup for the rootfs
+    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid_am.rules
+KERNEL=="amstream*",SUBSYSTEM=="amstream-dev",MODE="0666",GROUP="video"
+KERNEL=="amvideo*",SUBSYSTEM=="video",MODE="0666",GROUP="video"
+EOF
+
+    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid_mali.rules
+KERNEL=="mali",SUBSYSTEM=="misc",MODE="0777",GROUP="video"
+KERNEL=="ump",SUBSYSTEM=="ump",MODE="0777",GROUP="video"
+EOF
+
+    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid-shield.rules
+KERNEL=="ttySAC0", SYMLINK+="ttyACM99"
+EOF
+
+    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/50-odroid-hdmi.rules
+KERNEL=="fb1", SYMLINK+="fb6"
+EOF
+
+    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/60-odroid-cec.rules
+KERNEL=="CEC", MODE="0777"
+EOF
+
+    # x window
+    sudo mv ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf.old
+    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf
+Section "Screen"
+  Identifier "Default Screen"
+  Monitor "Configured Monitor"
+  Device "Configured Video Device"
+  DefaultDepth 16
+EndSection
+EOF
+
+    # SOUND
+    sudo cat > ${DN_ROOTFS_DEBIAN}/etc/asound.conf << EOF
+pcm.!default {
+  type plug
+  slave {
+    pcm "hw:0,1"
+  }
+}
+ctl.!default {
+  type hw
+  card 0
+}
+EOF
+
+    sudo sed -i \
+        -e "s|[# ]*load-module module-alsa-sink|load-module module-alsa-sink|g" \
+        -e "s|[# ]*load-module module-alsa-source device=hw:1,0|load-module module-alsa-source device=hw:0,1|g" \
+        ${DN_ROOTFS_DEBIAN}/etc/pulse/default.pa
+
+    sed -i "/exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" ${DN_ROOTFS_DEBIAN}/etc/rc.local
+}
+
 prepare() {
     my_setevn
     #rm -f "${FN_IMAGE}" ${PREFIX_TMP}*
 
-    rm -rf ${DN_BOOT}
+    rm -rf ${DN_BOOT_4KERNEL}
     rm -rf ${DN_ROOTFS_KERNEL}
     #rm -rf ${DN_ROOTFS_DEBIAN}
-    mkdir -p ${DN_BOOT}
+    mkdir -p ${DN_BOOT_4KERNEL}
     mkdir -p ${DN_ROOTFS_KERNEL}
     mkdir -p ${DN_ROOTFS_DEBIAN}
 
@@ -912,6 +1004,7 @@ prepare() {
     cd ${srcdir}
     # create rootfs
     kali_rootfs_debootstrap
+    prepare_hardkernel_rootfs
     echo "Build rootfs DONE!"
 }
 
