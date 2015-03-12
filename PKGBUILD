@@ -361,14 +361,15 @@ apt-get --yes --force-yes install locales-all
 debconf-set-selections /debconf.set
 rm -f /debconf.set
 
-locale-gen en_EN en_EN.UTF-8 en_EN ISO-8859-1
-update-locale LANG="en_EN.UTF-8" LANGUAGE="en_EN" LC_ALL="en_EN.UTF-8"
-dpkg-reconfigure tzdata
-dpkg-reconfigure locales
-
 apt-get update
 apt-get --yes --force-yes install git-core binutils ca-certificates initramfs-tools uboot-mkimage
 apt-get --yes --force-yes install locales console-common less nano git
+
+sed -i -e "s|^[#\w ]\{1,2\}en_US|en_US|g" /etc/locale.gen
+locale-gen en_US en_US.UTF-8 "en_US ISO-8859-1"
+update-locale LANG="en_US.UTF-8" LANGUAGE="en_US" LC_ALL="en_US.UTF-8"
+#dpkg-reconfigure tzdata
+#dpkg-reconfigure locales
 
 echo "root:toor" | chpasswd
 #USER1=pi ; useradd -m -s /bin/bash -G adm,sudo,plugdev,audio,video,cdrom,floppy,dip \${USER1} && echo "\${USER1}:\${USER1}" | chpasswd
@@ -382,8 +383,6 @@ update-rc.d ssh enable
 rm -f /usr/sbin/policy-rc.d
 rm -f /usr/sbin/invoke-rc.d
 dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
-
-
 
 rm -f /third-stage
 EOF
@@ -951,6 +950,10 @@ EOF
 KERNEL=="CEC", MODE="0777"
 EOF
 
+    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/99-input.rules
+KERNEL=="event*",NAME="input/%k",MODE="0660",GROUP="plugdev"
+EOF
+
     # x window
     sudo mv ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf.old
     sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf
@@ -977,8 +980,8 @@ ctl.!default {
 EOF
 
     sudo sed -i \
-        -e "s|[# ]*load-module module-alsa-sink|load-module module-alsa-sink|g" \
-        -e "s|[# ]*load-module module-alsa-source device=hw:1,0|load-module module-alsa-source device=hw:0,1|g" \
+        -e "s|^#[\w ]*load-module module-alsa-sink|load-module module-alsa-sink|g" \
+        -e "s|^#[\w ]*load-module module-alsa-source device=hw:1,0|load-module module-alsa-source device=hw:0,1|g" \
         ${DN_ROOTFS_DEBIAN}/etc/pulse/default.pa
 
     sed -i "/exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" ${DN_ROOTFS_DEBIAN}/etc/rc.local
