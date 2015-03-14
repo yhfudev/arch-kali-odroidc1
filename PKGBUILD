@@ -47,12 +47,12 @@ MAKE_CONFIG=odroidc_defconfig
 # script will throw an error, but will still continue on, and create an unusable
 # image, keep that in mind.
 PACKAGES_ARM="abootimg cgpt fake-hwclock ntpdate vboot-utils vboot-kernel-utils uboot-mkimage"
-PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils"
+PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils nfs-common lsb-release"
 PACKAGES_DESKTOP="xfce4 network-manager network-manager-gnome xserver-xorg-video-fbdev"
 PACKAGES_TOOLS="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool"
 PACKAGES_SERVICES="openssh-server apache2"
 PACKAGES_EXTRAS="iceweasel wpasupplicant"
-#PACKAGES_ADDON="fruitywifi wifite xfce4-goodies"
+#PACKAGES_ADDON="fruitywifi xfce4-goodies kali-linux-full"
 export PACKAGES="${PACKAGES_ARM} ${PACKAGES_BASE} ${PACKAGES_DESKTOP} ${PACKAGES_TOOLS} ${PACKAGES_SERVICES} ${PACKAGES_EXTRAS} ${PACKAGES_ADDON}"
 
 # the image container size
@@ -74,20 +74,20 @@ DISKLABEL_BOOTFS=BOOTFS
 
 
 DNSRC_UBOOT_HARDKERNEL=uboot-hardkernel-git
-GITCOMMIT_UBOOT_HARDKERNEL=e7d4447d551ccba5d60be8b11697aa0ab49086c4
+GITCOMMIT_UBOOT_HARDKERNEL=f631c80969b33b796d2d4c077428b4765393ed2b
 
 GITCOMMIT_LINUX=c193f5d80656ce6d471cf3a28fe8259b3e3a02c0
 GITCOMMIT_UBOOT=${GITCOMMIT_UBOOT_HARDKERNEL}
 DNSRC_LINUX=linux-${GITCOMMIT_LINUX}
 DNSRC_UBOOT=u-boot-${GITCOMMIT_UBOOT}
-USE_GIT_REPO=1
-DNSRC_UBOOT=${DNSRC_UBOOT_HARDKERNEL}
-DNSRC_LINUX=linux-hardkernel-git
+USE_GIT_REPO=0
+#DNSRC_UBOOT=${DNSRC_UBOOT_HARDKERNEL}
+#DNSRC_LINUX=linux-hardkernel-git
 
 
 source=(
         "kali-arm-build-scripts-git::git+https://github.com/yhfudev/kali-arm-build-scripts.git"
-        "${DNSRC_LINUX}::git+https://github.com/hardkernel/linux.git" # "https://github.com/hardkernel/linux/archive/${GITCOMMIT_LINUX}.tar.gz"
+        "https://github.com/hardkernel/linux/archive/${GITCOMMIT_LINUX}.tar.gz" # "${DNSRC_LINUX}::git+https://github.com/hardkernel/linux.git"
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" #http://releases.linaro.org/14.09/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz
         "firmware-linux-git::git+https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
         "kali-wifi-injection-3.18.patch" #"mac80211.patch::https://raw.github.com/offensive-security/kali-arm-build-scripts/master/patches/kali-wifi-injection-3.12.patch"
@@ -96,9 +96,11 @@ source=(
 
         # u-boot
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
-        "${DNSRC_UBOOT_HARDKERNEL}::git+https://github.com/hardkernel/u-boot.git" #"https://github.com/hardkernel/u-boot/archive/${GITCOMMIT_UBOOT_HARDKERNEL}.tar.gz"
+        "https://github.com/hardkernel/u-boot/archive/${GITCOMMIT_UBOOT_HARDKERNEL}.tar.gz" # "${DNSRC_UBOOT_HARDKERNEL}::git+https://github.com/hardkernel/u-boot.git"
         "boot.ini.template"
         "sd_fusing.sh"
+
+        "odroid-utility-git::git+https://github.com/mdrjr/odroid-utility.git"
         )
 
 md5sums=(
@@ -383,6 +385,9 @@ update-rc.d ssh enable
 rm -f /usr/sbin/policy-rc.d
 rm -f /usr/sbin/invoke-rc.d
 dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
+
+sed -i -e 's|^[# ]*NEED_STATD[ ]*=.*$|NEED_STATD=yes|' /etc/default/nfs-common
+update-rc.d rpcbind enable
 
 rm -f /third-stage
 EOF
@@ -709,7 +714,8 @@ fi
     (cd $(dirname ${FN_IMAGE}) && sha1sum $(basename ${FN_IMAGE}) > ${FN_IMAGE}.sha1sum)
     if which bmaptool; then
         bmaptool create -o ${FN_IMAGE}.bmap ${FN_IMAGE}
-    else if which pixz; then
+    fi
+    if which pixz; then
         # Don't pixz on 32bit, there isn't enough memory to compress the images.
         HW=$(uname -m)
         if [ ${HW} == 'x86_64' ]; then
@@ -721,7 +727,7 @@ fi
                 (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
             fi
         fi
-    fi fi
+    fi
 
 fi
 }
@@ -984,7 +990,39 @@ EOF
         -e "s|^#[\w ]*load-module module-alsa-source device=hw:1,0|load-module module-alsa-source device=hw:0,1|g" \
         ${DN_ROOTFS_DEBIAN}/etc/pulse/default.pa
 
-    sed -i "/exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" ${DN_ROOTFS_DEBIAN}/etc/rc.local
+    sudo sed -i -e "/^[^#]*exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" ${DN_ROOTFS_DEBIAN}/etc/rc.local
+
+if [ 0 = 1 ]; then
+    # TO be verified ....
+    # http://forum.odroid.com/viewtopic.php?f=114&t=8281
+    # http://forum.odroid.com/viewtopic.php?f=115&t=8121#p64249
+    # ArchLinux: Improve network speed
+    sudo sed -i \
+        -e "/exit 0/i\echo 32768 > /proc/sys/net/core/rps_sock_flow_entries" \
+        -e "/exit 0/i\echo 2048 > /sys/class/net/eth0/queues/rx-0/rps_flow_cnt" \
+        -e "/exit 0/i\echo f > /sys/class/net/eth0/queues/rx-0/rps_cpus" \
+        -e "/exit 0/i\# Set XPS" \
+        -e "/exit 0/i\echo c > /sys/class/net/eth0/queues/tx-0/xps_cpus" \
+        -e "/exit 0/i\#Reconnect" \
+        -e "/exit 0/i\ifconfig eth0 down" \
+        ${DN_ROOTFS_DEBIAN}/etc/rc.local
+
+    # Slow Network speeds over NFS
+    # http://forum.odroid.com/viewtopic.php?f=117&t=8096
+    echo "echo 'blacklist rpcsec_gss_krb5' >> ${DN_ROOTFS_DEBIAN}/etc/modprobe.d/blacklist.conf" | sudo sh
+fi
+
+    FILES=`cat ${srcdir}/odroid-utility-git/files.txt`
+    for fu in odroid-utility.sh $FILES; do
+        sudo cp ${srcdir}/odroid-utility-git/$fu ${DN_ROOTFS_DEBIAN}/usr/local/bin/
+    done
+    # patch for kali:
+    sed -i \
+        -e  '/"Debian")/ i\Kali) export DISTRO="debian" ;;' \
+        -e  's@`curl -s $baseurl/files.txt`@`curl -s $baseurl/files.txt|grep -v odroid-utility.sh`@' \
+        ${DN_ROOTFS_DEBIAN}/usr/local/bin/odroid-utility.sh
+
+    sudo chmod +x ${DN_ROOTFS_DEBIAN}/usr/local/bin/odroid-utility.sh
 }
 
 prepare() {
