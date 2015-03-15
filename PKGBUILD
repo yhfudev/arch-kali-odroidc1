@@ -700,10 +700,9 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         echo "tar rootfs from into image file"
         if which bsdtar; then
             # create a tar package for whole system, include /boot and /
-            sudo bsdtar -C "${DN_ROOT}" -cf ${FN_IMAGE}.files.tar.gz .
+            sudo bsdtar -C "${DN_ROOT}" -cf "${FN_IMAGE_BASE}.tar.gz" .
+            touch "${PREFIX_TMP}-FLG_BSDTAR_ROOTFS"
         fi
-
-        touch "${PREFIX_TMP}-FLG_BSDTAR_ROOTFS"
     fi
 
     # Unmount partitions
@@ -800,7 +799,8 @@ my_setevn() {
         MACHINECORES=2
     fi
 
-    export FN_IMAGE="${srcdir}/${pkgname}-${pkgver}-${MACHINEARCH}.img"
+    export FN_IMAGE_BASE="${srcdir}/${pkgname}-${pkgver}-${MACHINEARCH}"
+    export FN_IMAGE="${FN_IMAGE_BASE}.img"
 
     #export DN_TOOLCHAIN_UBOOT="${srcdir}/toolchains-uboot-${MACHINEARCH}"
     #export DN_TOOLCHAIN_KERNEL="${srcdir}/toolchains-kernel-${MACHINEARCH}"
