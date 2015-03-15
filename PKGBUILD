@@ -51,12 +51,12 @@ PACKAGES_DESKTOP="xfce4 network-manager network-manager-gnome xserver-xorg-video
 PACKAGES_TOOLS="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool"
 PACKAGES_SERVICES="openssh-server apache2"
 PACKAGES_EXTRAS="iceweasel wpasupplicant"
-PACKAGES_ADDON="fruitywifi xfce4-goodies kali-linux-full"
+#PACKAGES_ADDON="fruitywifi xfce4-goodies kali-linux-full"
 export PACKAGES="${PACKAGES_ARM} ${PACKAGES_BASE} ${PACKAGES_DESKTOP} ${PACKAGES_TOOLS} ${PACKAGES_SERVICES} ${PACKAGES_EXTRAS} ${PACKAGES_ADDON}"
 
 # the image container size
 IMGCONTAINER_SIZE=3000 # Size of image in megabytes
-IMGCONTAINER_SIZE=6500 # MB, size of kali-linux-full
+#IMGCONTAINER_SIZE=6500 # MB, size of kali-linux-full
 
 # If you have your own preferred mirrors, set them here.
 # You may want to leave security.kali.org alone, but if you trust your local
