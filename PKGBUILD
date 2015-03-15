@@ -11,10 +11,11 @@ license=('GPL')
 optdepends=(
     'pixz'
     'bmap-tools'
+    'bsdtar'
     )
 
 makedepends=(
-    'git' 'bc' 'gcc-libs' 'bash'
+    'git' 'bc' 'gcc-libs' 'bash' 'sudo'
     'ncurses' 'lzop' 'uboot-tools' # for kernel
     'qemu' 'qemu-user-static-exp' 'binfmt-support' # cross compile and chroot
     'debootstrap' # to create debian rootfs
@@ -56,7 +57,7 @@ export PACKAGES="${PACKAGES_ARM} ${PACKAGES_BASE} ${PACKAGES_DESKTOP} ${PACKAGES
 
 # the image container size
 IMGCONTAINER_SIZE=3000 # Size of image in megabytes
-#IMGCONTAINER_SIZE=6500 # MB, size of kali-linux-full
+#IMGCONTAINER_SIZE=7000 # MB, size of kali-linux-full
 
 # If you have your own preferred mirrors, set them here.
 # You may want to leave security.kali.org alone, but if you trust your local
@@ -619,7 +620,7 @@ kali_create_image() {
         echo "[DBG] SKIP creating image file ${FN_IMAGE}"
     fi
 
-if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROOTFS" || ! -f "${PREFIX_TMP}-FLG_RSYNC_KERNEL" ]]; then
+if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROOTFS" || ! -f "${PREFIX_TMP}-FLG_RSYNC_KERNEL" || ! -f "${PREFIX_TMP}-FLG_BSDTAR_ROOTFS" ]]; then
     # Set the partition variables
     DEV_LOOP=$(sudo losetup -f --show ${FN_IMAGE})
     if [ "${DEV_LOOP}" = "" ]; then
@@ -692,18 +693,30 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         touch "${PREFIX_TMP}-FLG_RSYNC_KERNEL"
     fi
 
-    # create a tar package for whole system, include /boot and /
-    bsdtar cf  ${FN_IMAGE}.files.tar.gz "${DN_ROOT}"
+    if [ -f "${PREFIX_TMP}-FLG_BSDTAR_ROOTFS" ]; then
+        echo "[DBG] SKIP bsdtar rootfs"
+
+    else
+        echo "tar rootfs from into image file"
+        if which bsdtar; then
+            # create a tar package for whole system, include /boot and /
+            sudo bsdtar -C "${DN_ROOT}" -cf ${FN_IMAGE}.files.tar.gz .
+        fi
+
+        touch "${PREFIX_TMP}-FLG_BSDTAR_ROOTFS"
+    fi
 
     # Unmount partitions
     sudo umount ${DN_BOOT_4IMAGE}
     sudo umount ${DN_ROOT}
+    sleep 5  # wait umount
     sudo kpartx -dv ${DEV_LOOP}
     sudo losetup -d ${DEV_LOOP}
     if [ ! "$?" = "0" ]; then
         echo "error in losetup"
         exit 1
     fi
+fi
 
     check_kali_image "${FN_IMAGE}"
 
@@ -711,25 +724,30 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
     # don't need the sha1sum or to compress the image, since you will be testing it
     # soon.
     echo "Generating sha1sum for ${FN_IMAGE}"
-    (cd $(dirname ${FN_IMAGE}) && sha1sum $(basename ${FN_IMAGE}) > ${FN_IMAGE}.sha1sum)
-    if which bmaptool; then
-        bmaptool create -o ${FN_IMAGE}.bmap ${FN_IMAGE}
+    if [ ! -f "${FN_IMAGE}.sha1sum" ]; then
+        (cd $(dirname ${FN_IMAGE}) && sha1sum $(basename ${FN_IMAGE}) > ${FN_IMAGE}.sha1sum)
     fi
-    if which pixz; then
-        # Don't pixz on 32bit, there isn't enough memory to compress the images.
-        HW=$(uname -m)
-        if [ ${HW} == 'x86_64' ]; then
-            echo "Compressing ${FN_IMAGE}"
-            pixz ${FN_IMAGE} ${FN_IMAGE}.xz
-            if [ "$?" = "0" ]; then
-                rm -f ${FN_IMAGE}
-                echo "Generating sha1sum for ${FN_IMAGE}.xz"
-                (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
+    if [ ! -f "${FN_IMAGE}.bmap" ]; then
+        if which bmaptool; then
+            bmaptool create -o ${FN_IMAGE}.bmap ${FN_IMAGE}
+        fi
+    fi
+    if [ ! -f "${FN_IMAGE}.xz" ]; then
+        if which pixz; then
+            # Don't pixz on 32bit, there isn't enough memory to compress the images.
+            HW=$(uname -m)
+            if [ ${HW} == 'x86_64' ]; then
+                echo "Compressing ${FN_IMAGE}"
+                pixz ${FN_IMAGE} ${FN_IMAGE}.xz
+                if [ "$?" = "0" ]; then
+                    rm -f ${FN_IMAGE}
+                    echo "Generating sha1sum for ${FN_IMAGE}.xz"
+                    (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
+                fi
             fi
         fi
     fi
 
-fi
 }
 
 my0_getpath () {
@@ -1141,6 +1159,7 @@ check_kali_image() {
     PARAM_FN_IMAGE="$1"
     shift
 
+    echo "[DBG] check_kali_image() ..."
     # Create the disk and partition it
     if [[ ! -f "${PARAM_FN_IMAGE}" ]]; then
         echo "Error: Not found image file ${PARAM_FN_IMAGE}"
@@ -1155,7 +1174,7 @@ check_kali_image() {
     fi
     LOOPNAME=$(sudo kpartx -va ${DEV_LOOP} | sed -E 's/.*(loop[0-9])p.*/\1/g' | head -1)
     if [ "${LOOPNAME}" = "" ]; then
-        echo "Error in loop device"
+        echo "Error in loop device 2: ${DEV_LOOP}"
         exit 1
     fi
     #partprobe "${DEV_LOOP}" # to get /dev/loop0p1 ...
@@ -1167,7 +1186,7 @@ check_kali_image() {
     mkdir -p ${DN_ROOT}
     sudo mount $rootp ${DN_ROOT}
     if [ ! "$?" = "0" ]; then
-        echo "error in mount root"
+        echo "error in mount root "
         exit 1
     fi
 
