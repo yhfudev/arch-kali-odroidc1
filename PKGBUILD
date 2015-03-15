@@ -521,11 +521,10 @@ kali_rootfs_linuxkernel() {
 
     my0_check_valid_path "${DN_ROOTFS_KERNEL}"
     sudo mkdir -p "${DN_ROOTFS_KERNEL}/lib/"
-    sudo chown -R ${USER} "${DN_ROOTFS_KERNEL}/lib/"
     sudo rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware
     #git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git ${DN_ROOTFS_KERNEL}/lib/firmware
-    cp -r ${srcdir}/firmware-linux-git ${DN_ROOTFS_KERNEL}/lib/firmware
-    rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware/.git
+    sudo cp -r ${srcdir}/firmware-linux-git ${DN_ROOTFS_KERNEL}/lib/firmware
+    sudo rm -rf ${DN_ROOTFS_KERNEL}/lib/firmware/.git
 
 if [ 0 = 0 ]; then
     make uImage
@@ -538,21 +537,27 @@ else
     my0_check_valid_path "${DN_ROOTFS_KERNEL}"
     sudo mkdir -p "${DN_BOOT_4KERNEL}"
     sudo chown -R ${USER} "${DN_BOOT_4KERNEL}"
-    cp -rf ${srcdir}/firmware-raspberrypi-git/boot/* ${DN_BOOT_4KERNEL}
+    sudo cp -rf ${srcdir}/firmware-raspberrypi-git/boot/* ${DN_BOOT_4KERNEL}
 
-    cp arch/arm/boot/zImage ${DN_BOOT_4KERNEL}/${FN_RPI_KERNEL}
+    sudo cp arch/arm/boot/zImage ${DN_BOOT_4KERNEL}/${FN_RPI_KERNEL}
 
-    cat << EOF > ${DN_BOOT_4KERNEL}/cmdline.txt
+    T="${PREFIX_TMP}-cmdline.txt"
+    cat << EOF > "${T}"
 dwc_otg.lpm_enable=0 console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 elevator=deadline root=/dev/mmcblk0p2 rootfstype=ext4 rootwait
 EOF
+    sudo mv "${T}" "${DN_BOOT_4KERNEL}/cmdline.txt"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
+
     # rpi-wiggle
-    mkdir -p ${DN_ROOTFS_KERNEL}/scripts
+    sudo mkdir -p ${DN_ROOTFS_KERNEL}/scripts
     #wget https://raw.github.com/dweeber/rpiwiggle/master/rpi-wiggle -O ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
-    cp ${srcdir}/rpiwiggle-git/rpi-wiggle ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
-    chmod 755 ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
+    sudo cp ${srcdir}/rpiwiggle-git/rpi-wiggle ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
+    sudo chmod 755 ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
 fi
 
-    sudo chown -R root:root "${DN_ROOTFS_KERNEL}"
 }
 
 rsync_and_verify() {
@@ -593,6 +598,7 @@ kali_create_image() {
     if [[ ! -f "${FN_IMAGE}" || ! -f "${PREFIX_TMP}-FLG_KALI_CREATE_IMAGE" ]]; then
         echo "Creating image file for ${pkgdesc}: ${FN_IMAGE}"
         # check Ubuntu Partition Table http://odroid.com/dokuwiki/doku.php?id=en:c1_partition_table
+        sudo rm -f "${FN_IMAGE}"
         dd if=/dev/zero of=${FN_IMAGE} bs=1M count=${IMGCONTAINER_SIZE}
         if [ ! "$?" = "0" ]; then
             echo "error in dd"
@@ -685,6 +691,9 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         rsync_and_verify "${PARAM_DN_ROOTFS_KERNEL}/" ${DN_ROOT}/
         touch "${PREFIX_TMP}-FLG_RSYNC_KERNEL"
     fi
+
+    # create a tar package for whole system, include /boot and /
+    bsdtar cf  ${FN_IMAGE}.files.tar.gz "${DN_ROOT}"
 
     # Unmount partitions
     sudo umount ${DN_BOOT_4IMAGE}
@@ -1049,7 +1058,12 @@ EOF
         echo "echo 'exit 0' >> ${DN_ROOTFS_DEBIAN}/etc/rc.local" | sudo sh
         sudo chmod 755 ${DN_ROOTFS_DEBIAN}/etc/rc.local
     fi
-    sudo sed -i -e "/^[^#]*exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" ${DN_ROOTFS_DEBIAN}/etc/rc.local
+
+    #sudo sed -i -e "/^[^#]*exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" ${DN_ROOTFS_DEBIAN}/etc/rc.local
+    grep -v 'echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank' ${DN_ROOTFS_DEBIAN}/etc/rc.local > tmp
+    sed -i -e "/^[^#]*exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" tmp
+    chmod 755 tmp
+    sudo mv tmp ${DN_ROOTFS_DEBIAN}/etc/rc.local
 
 if [ 0 = 1 ]; then
     # TO be verified ....
