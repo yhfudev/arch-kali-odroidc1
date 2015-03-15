@@ -12,7 +12,7 @@ You may compile the kali image for Odroid C1 in one step:
 
     git clone https://github.com/yhfudev/arch-kali-odroidc1.git
     cd arch-kali-odroidc1
-    ./runme.sh
+    sudo ./runme.sh
 
 You may want to run above commands in a virtual machine by user root,
 otherwise you may be annoyed by the sudo command :-)

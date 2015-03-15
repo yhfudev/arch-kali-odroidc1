@@ -33,7 +33,6 @@ conflicts=('kali-odroidc1')
 # config for Odroid C1
 ARCHITECTURE="armhf"
 PATCH_MAC80211="kali-arm-build-scripts-git/patches/kali-wifi-injection-3.12.patch"
-#PATCH_MAC80211="kali-wifi-injection-3.18.patch"
 CONFIG_KERNEL="odroidc1-3.10.config"
 PATCH_CONFIG_KERNEL="odroidc1-kernel-config.patch"
 MAKE_CONFIG=odroidc_defconfig
@@ -52,11 +51,12 @@ PACKAGES_DESKTOP="xfce4 network-manager network-manager-gnome xserver-xorg-video
 PACKAGES_TOOLS="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool"
 PACKAGES_SERVICES="openssh-server apache2"
 PACKAGES_EXTRAS="iceweasel wpasupplicant"
-#PACKAGES_ADDON="fruitywifi xfce4-goodies kali-linux-full"
+PACKAGES_ADDON="fruitywifi xfce4-goodies kali-linux-full"
 export PACKAGES="${PACKAGES_ARM} ${PACKAGES_BASE} ${PACKAGES_DESKTOP} ${PACKAGES_TOOLS} ${PACKAGES_SERVICES} ${PACKAGES_EXTRAS} ${PACKAGES_ADDON}"
 
 # the image container size
 IMGCONTAINER_SIZE=3000 # Size of image in megabytes
+IMGCONTAINER_SIZE=6500 # MB, size of kali-linux-full
 
 # If you have your own preferred mirrors, set them here.
 # You may want to leave security.kali.org alone, but if you trust your local
@@ -84,19 +84,18 @@ USE_GIT_REPO=0
 #DNSRC_UBOOT=${DNSRC_UBOOT_HARDKERNEL}
 #DNSRC_LINUX=linux-hardkernel-git
 
-
 source=(
         "kali-arm-build-scripts-git::git+https://github.com/yhfudev/kali-arm-build-scripts.git"
         "https://github.com/hardkernel/linux/archive/${GITCOMMIT_LINUX}.tar.gz" # "${DNSRC_LINUX}::git+https://github.com/hardkernel/linux.git"
         "http://dn.odroid.com/toolchains/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz" #http://releases.linaro.org/14.09/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz
         "firmware-linux-git::git+https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
-        "kali-wifi-injection-3.18.patch" #"mac80211.patch::https://raw.github.com/offensive-security/kali-arm-build-scripts/master/patches/kali-wifi-injection-3.12.patch"
         "odroidc1-3.10.config"
         "odroidc1-kernel-config.patch"
+        "kali-wifi-injection-chan.c.patch" # patch for net/wireless/chan.c from kali-arm-build-scripts-git/patches/kali-wifi-injection-3.18.patch
 
         # u-boot
-        "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
         "https://github.com/hardkernel/u-boot/archive/${GITCOMMIT_UBOOT_HARDKERNEL}.tar.gz" # "${DNSRC_UBOOT_HARDKERNEL}::git+https://github.com/hardkernel/u-boot.git"
+        "http://dn.odroid.com/toolchains/gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
         "boot.ini.template"
         "sd_fusing.sh"
 
@@ -104,32 +103,32 @@ source=(
         )
 
 md5sums=(
-         'SKIP'
-         'SKIP'
+         'SKIP' # kali-arm-build-scripts-git
+         'SKIP' # linux
          'd7805745171f63c2556083e20abbd8eb' # gcc for kernel
-         'SKIP'
-         'SKIP'
-         '37b89f74e3f9f6c20295da564ece5b8f'
-         'e54725fa965b4b8531563f40a420a40c'
-         'a658e75a84cf9fe0874baad602049703'
+         'SKIP' # firmware-linux-git
+         'e54725fa965b4b8531563f40a420a40c' # odroidc1-3.10.config
+         '3006f3b72f678f2a1ea707b16e0cc8f5' # odroidc1-kernel-config.patch
+         '7e52e713f85591ee8b1cf43474da4425' # kali-wifi-injection-chan.c.patch
+         'SKIP' # u-boot
          '12d6e8a0cbd2d8e130cc8f55389a95c3' # gcc for uboot
-         'SKIP'
-         'f191e1ab6910983585ac877f17eed4e7'
-         'bb60369d23ba492e41524c9338f678c1'
+         '5dc37b921aef0877a1b32f741c27571b' # boot.ini.template
+         'bb60369d23ba492e41524c9338f678c1' # sd_fusing.sh
+         'SKIP' # odroid-utility-git
          )
 sha1sums=(
-         'SKIP'
-         'SKIP'
-         'b6d5f985ac254b1d60d8f01459f64d248adb7838'
-         'SKIP'
-         'SKIP'
-         '48ce0c7886128fb068b70b5692b60a6c5aec0e96'
-         '95cb733d04afb2960beb7c4f5090ca47b943c8d0'
-         '125003dfdbef989b8e2cf1bc19cdac45df8742e1'
-         '8069f484cfd5a7ea02d5bb74b56ae6c99e478d13'
-         'SKIP'
-         '72dcfa52d9ec175eb7df5f5d80503e3432d6490c'
-         '79af8ab465eeb371e83b0b3670869f087040080b'
+         'SKIP' # kali-arm-build-scripts-git
+         'SKIP' # linux
+         'b6d5f985ac254b1d60d8f01459f64d248adb7838' # gcc for kernel
+         'SKIP' # firmware-linux-git
+         '95cb733d04afb2960beb7c4f5090ca47b943c8d0' # odroidc1-3.10.config
+         '26b87b084b894934851af9560af600c628b115ac' # odroidc1-kernel-config.patch
+         '84538b4eed140aa186e9fa9af38db08f07c0af14' # kali-wifi-injection-chan.c.patch
+         'SKIP' # u-boot
+         '8069f484cfd5a7ea02d5bb74b56ae6c99e478d13' # gcc for uboot
+         '2cba8b991d841f773123debc9a4ab43b7a422f04' # boot.ini.template
+         '79af8ab465eeb371e83b0b3670869f087040080b' # sd_fusing.sh
+         'SKIP' # odroid-utility-git
          )
 
 pkgver() {
@@ -196,10 +195,11 @@ kali_rootfs_debootstrap() {
     sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     echo "[DBG] debootstrap state 1"
-    if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1" ]]; then
+    if [ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1" ]; then
         echo "[DBG] SKIP debootstrap state 1"
 
     else
+echo "[DBG] not exist file: ${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1"
         # create the rootfs - not much to modify here, except maybe the hostname.
         echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
         sudo debootstrap --foreign --no-check-gpg --include=ca-certificates,ssh,vim,locales,ntpdate,usbmount,initramfs-tools --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
@@ -216,7 +216,7 @@ kali_rootfs_debootstrap() {
     fi
 
     echo "[DBG] debootstrap state 2"
-    if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE2" ]]; then
+    if [ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE2" ]; then
         echo "[DBG] SKIP debootstrap state 2"
 
     else
@@ -322,7 +322,7 @@ EOF
     touch "${DN_ROOTFS_DEBIAN}/tmp/.tmpfs"
 
     echo "[DBG] debootstrap state 3"
-    if [[ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3" ]]; then
+    if [ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3" ]; then
         echo "[DBG] SKIP debootstrap state 3"
 
     else
@@ -473,7 +473,7 @@ EOF
         fi
         sudo umount "${DN_ROOTFS_DEBIAN}/sys/"
 
-        sudo chown -R root:root "${DN_ROOTFS_DEBIAN}"
+        #sudo chown -R root:root "${DN_ROOTFS_DEBIAN}"
         touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3"
     fi
 
@@ -488,7 +488,7 @@ EOF
 kali_rootfs_linuxkernel() {
     # compile and install linux kernel for Raspberry Pi 2, install rpi2 specified tools
 
-    if [[ -f "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE" ]]; then
+    if [ -f "${PREFIX_TMP}-FLG_KERNEL_COMPILE_CORE" ]; then
         echo "[DBG] SKIP compile kernel core"
 
     else
@@ -629,7 +629,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
     bootp="/dev/mapper/${LOOPNAME}p1"
     rootp="/dev/mapper/${LOOPNAME}p2"
 
-    if [[ -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" ]]; then
+    if [ -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" ]; then
         echo "[DBG] SKIP rsync rootfs"
 
     else
@@ -668,7 +668,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         exit 1
     fi
 
-    if [[ -f "${PREFIX_TMP}-FLG_RSYNC_ROOTFS" ]]; then
+    if [ -f "${PREFIX_TMP}-FLG_RSYNC_ROOTFS" ]; then
         echo "[DBG] SKIP rsync rootfs"
 
     else
@@ -677,7 +677,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         touch "${PREFIX_TMP}-FLG_RSYNC_ROOTFS"
     fi
 
-    if [[ -f "${PREFIX_TMP}-FLG_RSYNC_KERNEL" ]]; then
+    if [ -f "${PREFIX_TMP}-FLG_RSYNC_KERNEL" ]; then
         echo "[DBG] SKIP rsync rootfs"
 
     else
@@ -685,17 +685,6 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         rsync_and_verify "${PARAM_DN_ROOTFS_KERNEL}/" ${DN_ROOT}/
         touch "${PREFIX_TMP}-FLG_RSYNC_KERNEL"
     fi
-
-    # Enable login over serial
-if [ 0 = 1 ]; then
-    echo "echo 'T0:23:respawn:/sbin/agetty -L ttyAMA0 115200 vt100' >> ${DN_ROOT}/etc/inittab" | sudo sh
-else
-    echo "echo 'T0:123:respawn:/sbin/getty -L ttyS0 115200 vt100' >> ${DN_ROOT}/etc/inittab" | sudo sh
-fi
-
-    # if use hdr, uncomment following
-    #ROOT_UUID=$(blkid $rootp | sed -n 's/.*UUID=\"\([^\"]*\)\".*/\1/p')
-    #sed -i -e "s/root=[^\w ]*/root=${ROOT_UUID}/" "${DN_BOOT_4IMAGE}/boot.int"
 
     # Unmount partitions
     sudo umount ${DN_BOOT_4IMAGE}
@@ -706,6 +695,8 @@ fi
         echo "error in losetup"
         exit 1
     fi
+
+    check_kali_image "${FN_IMAGE}"
 
     # If you're building an image for yourself, comment all of this out, as you
     # don't need the sha1sum or to compress the image, since you will be testing it
@@ -844,6 +835,11 @@ prepare_hardkernel_kernel () {
         git checkout odroidc-3.10.y
     fi
 
+    patch -p1 --no-backup-if-mismatch < ${srcdir}/kali-wifi-injection-chan.c.patch
+    if [ ! "$?" = "0" ]; then
+        echo "error in patch kali-wifi-injection-chan.c.patch"
+        exit 1
+    fi
     patch -p1 --no-backup-if-mismatch < ${srcdir}/${PATCH_MAC80211}
     if [ ! "$?" = "0" ]; then
         echo "error in patch ${PATCH_MAC80211}"
@@ -934,35 +930,83 @@ fi
 
 prepare_hardkernel_rootfs () {
     # addtional setup for the rootfs
-    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid_am.rules
+
+    # Enable login over serial
+    echo "echo 'T0:123:respawn:/sbin/getty -L ttyS0 115200 vt100' >> ${DN_ROOTFS_DEBIAN}/etc/inittab" | sudo sh
+
+    # if use hdr, uncomment following
+    #ROOT_UUID=$(blkid $rootp | sed -n 's/.*UUID=\"\([^\"]*\)\".*/\1/p')
+    #sudo sed -i -e "s/root=[^\w ]*/root=${ROOT_UUID}/" "${DN_BOOT_4KERNEL}/boot.int"
+
+    sudo mkdir -p "${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/"
+
+    T="${PREFIX_TMP}-10-odroid_am.rules"
+    cat << EOF > "${T}"
 KERNEL=="amstream*",SUBSYSTEM=="amstream-dev",MODE="0666",GROUP="video"
 KERNEL=="amvideo*",SUBSYSTEM=="video",MODE="0666",GROUP="video"
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid_am.rules"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
-    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid_mali.rules
+    T="${PREFIX_TMP}-10-odroid_mali.rules"
+    cat << EOF > "${T}"
 KERNEL=="mali",SUBSYSTEM=="misc",MODE="0777",GROUP="video"
 KERNEL=="ump",SUBSYSTEM=="ump",MODE="0777",GROUP="video"
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid_mali.rules"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
-    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid-shield.rules
+    T="${PREFIX_TMP}-10-odroid-shield.rules"
+    cat << EOF > "${T}"
 KERNEL=="ttySAC0", SYMLINK+="ttyACM99"
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/10-odroid-shield.rules"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
-    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/50-odroid-hdmi.rules
+    T="${PREFIX_TMP}-50-odroid-hdmi.rules"
+    cat << EOF > "${T}"
 KERNEL=="fb1", SYMLINK+="fb6"
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/50-odroid-hdmi.rules"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
-    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/60-odroid-cec.rules
+    T="${PREFIX_TMP}-60-odroid-cec.rules"
+    cat << EOF > "${T}"
 KERNEL=="CEC", MODE="0777"
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/60-odroid-cec.rules"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
-    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/99-input.rules
+    T="${PREFIX_TMP}-99-input.rules"
+    cat << EOF > "${T}"
 KERNEL=="event*",NAME="input/%k",MODE="0660",GROUP="plugdev"
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/udev/rules.d/99-input.rules"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
     # x window
+    mkdir -p ${DN_ROOTFS_DEBIAN}/etc/X11/
     sudo mv ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf.old
-    sudo cat << EOF > ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf
+    T="${PREFIX_TMP}-xorg.conf"
+    cat << EOF > "${T}"
 Section "Screen"
   Identifier "Default Screen"
   Monitor "Configured Monitor"
@@ -970,9 +1014,15 @@ Section "Screen"
   DefaultDepth 16
 EndSection
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
     # SOUND
-    sudo cat > ${DN_ROOTFS_DEBIAN}/etc/asound.conf << EOF
+    T="${PREFIX_TMP}-asound.conf"
+    cat << EOF > "${T}"
 pcm.!default {
   type plug
   slave {
@@ -984,12 +1034,21 @@ ctl.!default {
   card 0
 }
 EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/asound.conf"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
     sudo sed -i \
         -e "s|^#[\w ]*load-module module-alsa-sink|load-module module-alsa-sink|g" \
         -e "s|^#[\w ]*load-module module-alsa-source device=hw:1,0|load-module module-alsa-source device=hw:0,1|g" \
         ${DN_ROOTFS_DEBIAN}/etc/pulse/default.pa
 
+    if [ ! -f ${DN_ROOTFS_DEBIAN}/etc/rc.local ]; then
+        echo "echo 'exit 0' >> ${DN_ROOTFS_DEBIAN}/etc/rc.local" | sudo sh
+        sudo chmod 755 ${DN_ROOTFS_DEBIAN}/etc/rc.local
+    fi
     sudo sed -i -e "/^[^#]*exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" ${DN_ROOTFS_DEBIAN}/etc/rc.local
 
 if [ 0 = 1 ]; then
@@ -1023,6 +1082,105 @@ fi
         ${DN_ROOTFS_DEBIAN}/usr/local/bin/odroid-utility.sh
 
     sudo chmod +x ${DN_ROOTFS_DEBIAN}/usr/local/bin/odroid-utility.sh
+}
+
+# check if the file exist in the created image file
+# pass in the mounted root path of the image file
+check_hardkernel_rootfs() {
+    PARAM_ROOT=$1
+    shift
+
+    chkfile_hardkernel=(
+        "${MNTPOINT_BOOT_FIRMWARE}/boot.ini"
+        "${MNTPOINT_BOOT_FIRMWARE}/bl1.bin.hardkernel"
+        "${MNTPOINT_BOOT_FIRMWARE}/u-boot.bin"
+        "${MNTPOINT_BOOT_FIRMWARE}/sd_fusing.sh"
+        "${MNTPOINT_BOOT_FIRMWARE}/dtbs/meson8b_odroidc.dtb"
+        "${MNTPOINT_BOOT_FIRMWARE}/uImage"
+
+        /etc/udev/rules.d/10-odroid_am.rules
+        /etc/udev/rules.d/10-odroid_mali.rules
+        /etc/udev/rules.d/10-odroid-shield.rules
+        /etc/udev/rules.d/50-odroid-hdmi.rules
+        /etc/udev/rules.d/60-odroid-cec.rules
+        /etc/udev/rules.d/99-input.rules
+        /etc/X11/xorg.conf
+        /etc/asound.conf
+        /usr/local/bin/odroid-utility.sh
+    )
+    FLG_ERROR=0
+    for i in ${chkfile_hardkernel[*]} ; do
+        if [ ! -f "${PARAM_ROOT}/${i}" ]; then
+            FLG_ERROR=1
+            echo "Error: not found required file at ${PARAM_ROOT}/${i}"
+        fi
+    done
+    if [ "${FLG_ERROR}" = "1" ]; then
+        echo "[DBG] check file error!"
+        exit 1
+    fi
+}
+
+
+# create a image file with two partitions: /boot/ and /
+check_kali_image() {
+    PARAM_FN_IMAGE="$1"
+    shift
+
+    # Create the disk and partition it
+    if [[ ! -f "${PARAM_FN_IMAGE}" ]]; then
+        echo "Error: Not found image file ${PARAM_FN_IMAGE}"
+        exit 1
+    fi
+
+    # Set the partition variables
+    DEV_LOOP=$(sudo losetup -f --show ${PARAM_FN_IMAGE})
+    if [ "${DEV_LOOP}" = "" ]; then
+        echo "error in losetup"
+        exit 1
+    fi
+    LOOPNAME=$(sudo kpartx -va ${DEV_LOOP} | sed -E 's/.*(loop[0-9])p.*/\1/g' | head -1)
+    if [ "${LOOPNAME}" = "" ]; then
+        echo "Error in loop device"
+        exit 1
+    fi
+    #partprobe "${DEV_LOOP}" # to get /dev/loop0p1 ...
+    bootp="/dev/mapper/${LOOPNAME}p1"
+    rootp="/dev/mapper/${LOOPNAME}p2"
+
+    # Create the dirs for the partitions and mount them
+    DN_ROOT="${srcdir}/mntrootfs-${MACHINEARCH}-${pkgname}-checker"
+    mkdir -p ${DN_ROOT}
+    sudo mount $rootp ${DN_ROOT}
+    if [ ! "$?" = "0" ]; then
+        echo "error in mount root"
+        exit 1
+    fi
+
+    DN_BOOT_4IMAGE="${DN_ROOT}${MNTPOINT_BOOT_FIRMWARE}"
+    sudo mkdir -p ${DN_BOOT_4IMAGE}
+    if [ ! "$?" = "0" ]; then
+        echo "error in mkdir ${DN_BOOT_4IMAGE}"
+        exit 1
+    fi
+    sudo mount $bootp ${DN_BOOT_4IMAGE}
+    if [ ! "$?" = "0" ]; then
+        echo "error in mount boot"
+        exit 1
+    fi
+
+    check_hardkernel_rootfs "${DN_ROOT}"
+
+    # Unmount partitions
+    sudo umount ${DN_BOOT_4IMAGE}
+    sudo umount ${DN_ROOT}
+    sudo kpartx -dv ${DEV_LOOP}
+    sudo losetup -d ${DEV_LOOP}
+    if [ ! "$?" = "0" ]; then
+        echo "error in losetup"
+        exit 1
+    fi
+
 }
 
 prepare() {
