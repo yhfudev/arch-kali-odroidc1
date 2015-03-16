@@ -167,6 +167,48 @@ unregister_qemuarm() {
     fi
 }
 
+# since the apt-get place lock in $ROOTFS/var/cache/apt/archives
+# we need to seperate the dir from multiple instances if we want to share the apt cache
+# so we place *.deb and lock file into two folders in ${SRCDEST}/apt-cache-armhf and ${srcdir}/apt-cache-armhf seperately
+
+# link the *.deb from ${SRCDEST}/apt-cache-armhf to ${srcdir}/apt-cache-armhf
+aptcache_link2srcdst() {
+    # the dir stores the real files
+    PARAM_DN_BASE=$1
+    shift
+    # the dir contains the symbol links
+    PARAM_DN_LINK=$1
+    shift
+
+    cd "${PARAM_DN_LINK}"
+    find "${PARAM_DN_BASE}" -name "*.deb" -type f | while read i; do
+        FN="$(basename ${i})"
+        sudo rm -f "${FN}"
+        sudo ln -s "${i}" "${FN}"
+    done
+    cd -
+}
+
+# backup the new downloaded *.deb from ${srcdir}/apt-cache-armhf to ${SRCDEST}/apt-cache-armhf
+aptcache_backup2srcdst() {
+    # the dir stores the real files
+    PARAM_DN_BASE=$1
+    shift
+    # the dir contains the symbol links
+    PARAM_DN_LINK=$1
+    shift
+
+    # make sure the files are not symbol links
+    cd "${PARAM_DN_LINK}"
+    find "${PARAM_DN_LINK}" -name "*.deb" -type f | while read i; do
+        FN="$(basename ${i})"
+        sudo mv "${i}" "${PARAM_DN_BASE}"
+        sudo rm -f "${FN}"
+        sudo ln -s "${PARAM_DN_BASE}/${FN}" "${FN}"
+    done
+    cd -
+}
+
 kali_rootfs_debootstrap() {
     PARAM_DN_DEBIAN=$1
     shift
@@ -176,7 +218,6 @@ kali_rootfs_debootstrap() {
     # the apt cache folder
     DN_APT_CACHE="${srcdir}/apt-cache-kali-${MACHINEARCH}"
     mkdir -p "${DN_APT_CACHE}"
-    mkdir -p "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     # build kali rootfs
     cd "$srcdir"
@@ -192,6 +233,11 @@ kali_rootfs_debootstrap() {
     if [ "${ISCROSS}" = "1" ]; then
         register_qemuarm
     fi
+
+    sudo mkdir -p "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+    sudo mkdir -p "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
+    sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real/"
+    aptcache_link2srcdst "../archives-real/" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
     sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
@@ -414,7 +460,9 @@ EOF
         fi
 
         # unmount the cache folder befor clean up, we may reuse the cache for other builds.
-        sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+        aptcache_backup2srcdst "../archives-real/" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+        sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
+        sudo rmdir "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
 
         cat << EOF > "${PREFIX_TMP}-aptlst"
 deb http://http.kali.org/kali kali main non-free contrib
@@ -487,7 +535,9 @@ EOF
     fi
 
     # make sure it umounted
-    sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+    aptcache_backup2srcdst "../archives-real/" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
+    sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
+    sudo rmdir "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
 
     if [ "${ISCROSS}" = "1" ]; then
         unregister_qemuarm
