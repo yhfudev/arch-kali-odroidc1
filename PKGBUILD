@@ -308,8 +308,16 @@ cat << EOF > "${PREFIX_TMP}-fstab"
 LABEL=${DISKLABEL_ROOTFS}   /           auto    defaults,noatime,nodiratime,errors=remount-ro  0       1
 LABEL=${DISKLABEL_BOOTFS}   ${MNTPOINT_BOOT_FIRMWARE}  auto    defaults,ro,owner,flush,umask=000        0       2
 
-tmpfs           /tmp        tmpfs   nodev,nosuid,size=10%,mode=1777     0       0
-#tmpfs           /var/log    tmpfs   nodev,nosuid,size=20%,mode=1755     0       0
+#tmpfs       /tmp        tmpfs   nodev,nosuid,mode=1777,size=10%         0   0
+tmpfs       /tmp        tmpfs   nodev,nosuid,mode=1777,size=100,noatime 0   0
+tmpfs       /var/tmp    tmpfs   defaults,noatime,nosuid,size=30m        0   0
+
+#tmpfs       /var/log    tmpfs   nodev,nosuid,size=20%,mode=1755     0       0
+tmpfs       /var/log    tmpfs   defaults,noatime,nosuid,mode=0755,size=100m 0   0
+
+# /var/run is a link to /run
+#tmpfs       /var/run    tmpfs   defaults,noatime,nosuid,mode=0755,size=2m   0   0
+
 proc            /proc       proc    defaults                            0       0
 EOF
     chmod 644 "${PREFIX_TMP}-fstab"
@@ -958,8 +966,24 @@ fi
 prepare_hardkernel_rootfs () {
     # addtional setup for the rootfs
 
-    # Enable login over serial
+    echo "Enable the Serial console"
+if [ 1 = 1 ]; then # for debug
     echo "echo 'T0:123:respawn:/sbin/getty -L ttyS0 115200 vt100' >> ${DN_ROOTFS_DEBIAN}/etc/inittab" | sudo sh
+else
+    sudo mkdir -p "${DN_ROOTFS_DEBIAN}/etc/init/"
+    T="${PREFIX_TMP}-ttyS0.conf"
+    cat << EOF > "${T}"
+start on stopped rc or RUNLEVEL=[12345]
+stop on runlevel [!12345]
+respawn
+exec /sbin/getty -L 115200 ttyS0 vt102
+EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/init/ttyS0.conf"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
+fi
 
     # if use hdr, uncomment following
     #ROOT_UUID=$(blkid $rootp | sed -n 's/.*UUID=\"\([^\"]*\)\".*/\1/p')
@@ -1213,7 +1237,6 @@ check_kali_image() {
         echo "error in losetup"
         exit 1
     fi
-
 }
 
 prepare() {
