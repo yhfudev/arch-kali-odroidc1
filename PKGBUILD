@@ -351,7 +351,7 @@ EOF
     fi
 
 cat << EOF > "${PREFIX_TMP}-fstab"
-LABEL=${DISKLABEL_ROOTFS}   /           auto    defaults,noatime,nodiratime,errors=remount-ro  0       1
+LABEL=${DISKLABEL_ROOTFS}   /           auto    defaults,noatime,data=writeback,errors=remount-ro  0       1
 LABEL=${DISKLABEL_BOOTFS}   ${MNTPOINT_BOOT_FIRMWARE}  auto    defaults,ro,owner,flush,umask=000        0       2
 
 tmpfs       /tmp        tmpfs   nodev,nosuid,mode=1777,size=10%         0   0
@@ -403,7 +403,8 @@ EOF
         fi
 
         # systemstart
-        sudo mv "${srcdir}/debian-systemstart.sh" "${DN_ROOTFS_DEBIAN}/etc/init.d/"
+        sudo cp "${srcdir}/debian-systemstart.sh" "${DN_ROOTFS_DEBIAN}/etc/init.d/systemstart"
+        sudo cp "${srcdir}/debian-zram.sh" "${DN_ROOTFS_DEBIAN}/etc/init.d/zram"
         if [ ! "$?" = "0" ]; then
             echo "Error in move script systemstart"
             exit 1
@@ -433,7 +434,6 @@ sed -i -e "s|^[#\w ]\{1,2\}en_US|en_US|g" /etc/locale.gen
 locale-gen en_US en_US.UTF-8 "en_US ISO-8859-1"
 update-locale LANG="en_US.UTF-8" LANGUAGE="en_US" LC_ALL="en_US.UTF-8"
 #dpkg-reconfigure locales
-
 dpkg-reconfigure -f noninteractive tzdata
 
 echo "root:toor" | chpasswd
@@ -449,7 +449,7 @@ rm -f /usr/sbin/policy-rc.d
 rm -f /usr/sbin/invoke-rc.d
 dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
 
-sed -i -e 's|^[# ]*NEED_STATD[ ]*=.*$|NEED_STATD=yes|' /etc/default/nfs-common
+sed -i -e 's|^[#\w ]*NEED_STATD[ ]*=.*$|NEED_STATD=yes|' /etc/default/nfs-common
 update-rc.d rpcbind enable
 
 # update usbmount
@@ -457,9 +457,10 @@ update-rc.d rpcbind enable
 sed -i -e 's|MOUNTOPTIONS="|MOUNTOPTIONS="utf8=1,|' /etc/usbmount/usbmount.conf
 
 # tmpfs
-sed -i -e 's|^[# ]*RAMTMP[ ]*=.*$|RAMTMP=yes|' /etc/default/tmpfs
+sed -i -e 's|^[#\w ]*RAMTMP[ ]*=.*$|RAMTMP=yes|' /etc/default/tmpfs
 
 insserv systemstart
+insserv zram
 
 rm -f /third-stage
 EOF
@@ -725,11 +726,18 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
             echo "error in format boot"
             exit 1
         fi
+
+        # Delete has_journal option
         sudo mkfs.ext4 -F -O ^has_journal -E stride=2,stripe-width=1024 -b 4096 -L ${DISKLABEL_ROOTFS} $rootp
         if [ ! "$?" = "0" ]; then
             echo "error in format root"
             exit 1
         fi
+
+        # enable writeback. this step should do before you use data=writeback in the fstab!
+        tune2fs -o journal_data_writeback
+
+        #dumpe2fs $rootp
         touch "${PREFIX_TMP}-FLG_FORMAT_IMAGE"
     fi
 
@@ -961,6 +969,11 @@ prepare_hardkernel_kernel () {
         echo "error in patch ${PATCH_CONFIG_KERNEL}"
         exit 1
     fi
+
+    # config ZRAM
+    sed -i 's|^[#\w ]*CONFIG_ZRAM=.*$|CONFIG_ZRAM=m|' .config
+
+    make oldconfig && make prepare
 
     #make modules_prepare
     #cp "${srcdir}/firmware-raspberrypi-git/extra/Module.symvers" . # copy Module.sysmvers to the linux directory
