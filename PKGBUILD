@@ -102,6 +102,7 @@ source=(
 
         "odroid-utility-git::git+https://github.com/mdrjr/odroid-utility.git"
         "debian-systemstart.sh"
+        "debian-zram.sh"
         )
 
 md5sums=(
@@ -118,6 +119,7 @@ md5sums=(
          'bb60369d23ba492e41524c9338f678c1' # sd_fusing.sh
          'SKIP' # odroid-utility-git
          '664c0e6d1c31555cb16440cc5d0ed8c1' # debian-systemstart.sh
+         '3793439a6f13115f2251e782646ee8e6' # debian-zram.sh
          )
 sha1sums=(
          'SKIP' # kali-arm-build-scripts-git
@@ -133,6 +135,7 @@ sha1sums=(
          '79af8ab465eeb371e83b0b3670869f087040080b' # sd_fusing.sh
          'SKIP' # odroid-utility-git
          '7329163a03497e25fc63556ecdbd3d28cbd28371' # debian-systemstart.sh
+         'ab5a6304d3e3ca5b315cff0bfa25558e38520100' # debian-zram.sh
          )
 
 pkgver() {
