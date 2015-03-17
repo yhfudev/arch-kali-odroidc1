@@ -47,7 +47,7 @@ MAKE_CONFIG=odroidc_defconfig
 # script will throw an error, but will still continue on, and create an unusable
 # image, keep that in mind.
 PACKAGES_ARM="abootimg cgpt fake-hwclock ntpdate vboot-utils vboot-kernel-utils uboot-mkimage"
-PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils nfs-common lsb-release"
+PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils nfs-common lsb-release ntfs-3g usbmount hdparm"
 PACKAGES_DESKTOP="xfce4 network-manager network-manager-gnome xserver-xorg-video-fbdev"
 PACKAGES_TOOLS="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool"
 PACKAGES_SERVICES="openssh-server apache2"
@@ -101,6 +101,7 @@ source=(
         "sd_fusing.sh"
 
         "odroid-utility-git::git+https://github.com/mdrjr/odroid-utility.git"
+        "debian-systemstart.sh"
         )
 
 md5sums=(
@@ -116,6 +117,7 @@ md5sums=(
          '5dc37b921aef0877a1b32f741c27571b' # boot.ini.template
          'bb60369d23ba492e41524c9338f678c1' # sd_fusing.sh
          'SKIP' # odroid-utility-git
+         '1cdcd53f32f429a7d2bc8b5a76d843de' # debian-systemstart.sh
          )
 sha1sums=(
          'SKIP' # kali-arm-build-scripts-git
@@ -130,6 +132,7 @@ sha1sums=(
          '2cba8b991d841f773123debc9a4ab43b7a422f04' # boot.ini.template
          '79af8ab465eeb371e83b0b3670869f087040080b' # sd_fusing.sh
          'SKIP' # odroid-utility-git
+         '050d28df32f340fe362c2427e37cfc4a21569b5b' # debian-systemstart.sh
          )
 
 pkgver() {
@@ -246,7 +249,7 @@ kali_rootfs_debootstrap() {
     else
         # create the rootfs - not much to modify here, except maybe the hostname.
         echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
-        sudo debootstrap --foreign --no-check-gpg --include=ca-certificates,ssh,vim,locales,ntpdate,usbmount,initramfs-tools --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
+        sudo debootstrap --foreign --no-check-gpg --include=ca-certificates,ssh,vim,locales,ntpdate,initramfs-tools --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1"
         else
@@ -399,6 +402,13 @@ EOF
             exit 1
         fi
 
+        # systemstart
+        sudo mv "${srcdir}/debian-systemstart.sh" "${DN_ROOTFS_DEBIAN}/etc/init.d/"
+        if [ ! "$?" = "0" ]; then
+            echo "Error in move script systemstart"
+            exit 1
+        fi
+
         cat << EOF > "${PREFIX_TMP}-ths"
 #!/bin/bash
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:$PATH
@@ -422,8 +432,9 @@ apt-get --yes --force-yes install locales console-common less nano git
 sed -i -e "s|^[#\w ]\{1,2\}en_US|en_US|g" /etc/locale.gen
 locale-gen en_US en_US.UTF-8 "en_US ISO-8859-1"
 update-locale LANG="en_US.UTF-8" LANGUAGE="en_US" LC_ALL="en_US.UTF-8"
-#dpkg-reconfigure tzdata
 #dpkg-reconfigure locales
+
+dpkg-reconfigure -f noninteractive tzdata
 
 echo "root:toor" | chpasswd
 #USER1=pi ; useradd -m -s /bin/bash -G adm,sudo,plugdev,audio,video,cdrom,floppy,dip \${USER1} && echo "\${USER1}:\${USER1}" | chpasswd
@@ -440,6 +451,15 @@ dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
 
 sed -i -e 's|^[# ]*NEED_STATD[ ]*=.*$|NEED_STATD=yes|' /etc/default/nfs-common
 update-rc.d rpcbind enable
+
+# update usbmount
+# MOUNTOPTIONS="sync,noexec,nodev,noatime,nodiratime"
+sed -i -e 's|MOUNTOPTIONS="|MOUNTOPTIONS="utf8=1,|' /etc/usbmount/usbmount.conf
+
+# tmpfs
+sed -i -e 's|^[# ]*RAMTMP[ ]*=.*$|RAMTMP=yes|' /etc/default/tmpfs
+
+insserv systemstart
 
 rm -f /third-stage
 EOF
