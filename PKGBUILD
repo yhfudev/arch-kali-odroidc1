@@ -105,13 +105,13 @@ source=(
 
 md5sums=(
          'SKIP' # kali-arm-build-scripts-git
-         'SKIP' # linux
+         '705e5f7f79449762628bed07cfa64429' # linux
          'd7805745171f63c2556083e20abbd8eb' # gcc for kernel
          'SKIP' # firmware-linux-git
          'e54725fa965b4b8531563f40a420a40c' # odroidc1-3.10.config
          '3006f3b72f678f2a1ea707b16e0cc8f5' # odroidc1-kernel-config.patch
          '7e52e713f85591ee8b1cf43474da4425' # kali-wifi-injection-chan.c.patch
-         'SKIP' # u-boot
+         'b55a420b3fad08ef6793eb9eb0990725' # u-boot
          '12d6e8a0cbd2d8e130cc8f55389a95c3' # gcc for uboot
          '5dc37b921aef0877a1b32f741c27571b' # boot.ini.template
          'bb60369d23ba492e41524c9338f678c1' # sd_fusing.sh
@@ -119,13 +119,13 @@ md5sums=(
          )
 sha1sums=(
          'SKIP' # kali-arm-build-scripts-git
-         'SKIP' # linux
+         '52834ca196ba0c82b8fb4e40aa4ea21ebaeafcb4' # linux
          'b6d5f985ac254b1d60d8f01459f64d248adb7838' # gcc for kernel
          'SKIP' # firmware-linux-git
          '95cb733d04afb2960beb7c4f5090ca47b943c8d0' # odroidc1-3.10.config
          '26b87b084b894934851af9560af600c628b115ac' # odroidc1-kernel-config.patch
          '84538b4eed140aa186e9fa9af38db08f07c0af14' # kali-wifi-injection-chan.c.patch
-         'SKIP' # u-boot
+         'b517fca84dd8791e2737ed5439d09c415ebb8e7e' # u-boot
          '8069f484cfd5a7ea02d5bb74b56ae6c99e478d13' # gcc for uboot
          '2cba8b991d841f773123debc9a4ab43b7a422f04' # boot.ini.template
          '79af8ab465eeb371e83b0b3670869f087040080b' # sd_fusing.sh
@@ -216,7 +216,7 @@ kali_rootfs_debootstrap() {
     shift
 
     # the apt cache folder
-    DN_APT_CACHE="${srcdir}/apt-cache-kali-${MACHINEARCH}"
+    DN_APT_CACHE="${SRCDEST}/apt-cache-kali-${MACHINEARCH}"
     mkdir -p "${DN_APT_CACHE}"
 
     # build kali rootfs
@@ -239,14 +239,11 @@ kali_rootfs_debootstrap() {
     sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real/"
     aptcache_link2srcdst "../archives-real/" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
-    sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
-
     echo "[DBG] debootstrap state 1"
     if [ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1" ]; then
         echo "[DBG] SKIP debootstrap state 1"
 
     else
-echo "[DBG] not exist file: ${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1"
         # create the rootfs - not much to modify here, except maybe the hostname.
         echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
         sudo debootstrap --foreign --no-check-gpg --include=ca-certificates,ssh,vim,locales,ntpdate,usbmount,initramfs-tools --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
@@ -612,7 +609,7 @@ EOF
 
     # rpi-wiggle
     sudo mkdir -p ${DN_ROOTFS_KERNEL}/scripts
-    #wget https://raw.github.com/dweeber/rpiwiggle/master/rpi-wiggle -O ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
+    #sudo wget https://raw.github.com/dweeber/rpiwiggle/master/rpi-wiggle -O ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
     sudo cp ${srcdir}/rpiwiggle-git/rpi-wiggle ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
     sudo chmod 755 ${DN_ROOTFS_KERNEL}/scripts/rpi-wiggle.sh
 fi
