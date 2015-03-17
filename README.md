@@ -24,6 +24,16 @@ Install to SD card by:
     dd bs=4M if=src/kali-odroidc1-image-1.1.0-armhf.img of=/dev/mmcblk0 && sync
 
 
+### Speeding up writing image
+
+If you install following tools in your build host before compiling the image, you'll get a compressed image file and bmap config file, and you may speed up writing the image file to a SD card:
+
+    apt-get install bsdtar bmap-tools pixz
+
+To install the image file to your SD card:
+
+    sudo bmaptool copy kali-odroidc1-image-1.1.0-armhf.img.xz /dev/mmcblk0
+
 Config
 ------
 You may be also interest in config or install other packages after booting the Kali:
