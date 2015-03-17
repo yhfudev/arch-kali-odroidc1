@@ -460,6 +460,7 @@ EOF
         aptcache_backup2srcdst "../archives-real/" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
         sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
         sudo rmdir "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
+        find "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives/" | while read i ; do sudo rm -rf $i; done
 
         cat << EOF > "${PREFIX_TMP}-aptlst"
 deb http://http.kali.org/kali kali main non-free contrib
@@ -483,6 +484,7 @@ export DEBIAN_FRONTEND=noninteractive
 rm -rf /root/.bash_history
 apt-get update
 apt-get clean
+find /var/cache/apt/archives/ | while read i ; do rm -f $i; done
 /etc/init.d/dbus stop
 /etc/init.d/ssh  stop
 rm -f /debconf.set
@@ -504,6 +506,7 @@ EOF
             exit 1
         fi
         sudo rm -f "${DN_ROOTFS_DEBIAN}/usr/bin/qemu*"
+        sudo rm -f "${DN_ROOTFS_DEBIAN}/debconf.set"
 
         sudo umount "${DN_ROOTFS_DEBIAN}/proc/sys/fs/binfmt_misc"
         #if [ ! "$?" = "0" ]; then
@@ -535,6 +538,7 @@ EOF
     aptcache_backup2srcdst "../archives-real/" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
     sudo umount "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
     sudo rmdir "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real"
+    find "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives/" | while read i ; do sudo rm -rf $i; done
 
     if [ "${ISCROSS}" = "1" ]; then
         unregister_qemuarm
