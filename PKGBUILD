@@ -117,7 +117,7 @@ md5sums=(
          '5dc37b921aef0877a1b32f741c27571b' # boot.ini.template
          'bb60369d23ba492e41524c9338f678c1' # sd_fusing.sh
          'SKIP' # odroid-utility-git
-         '1cdcd53f32f429a7d2bc8b5a76d843de' # debian-systemstart.sh
+         '664c0e6d1c31555cb16440cc5d0ed8c1' # debian-systemstart.sh
          )
 sha1sums=(
          'SKIP' # kali-arm-build-scripts-git
@@ -132,7 +132,7 @@ sha1sums=(
          '2cba8b991d841f773123debc9a4ab43b7a422f04' # boot.ini.template
          '79af8ab465eeb371e83b0b3670869f087040080b' # sd_fusing.sh
          'SKIP' # odroid-utility-git
-         '050d28df32f340fe362c2427e37cfc4a21569b5b' # debian-systemstart.sh
+         '7329163a03497e25fc63556ecdbd3d28cbd28371' # debian-systemstart.sh
          )
 
 pkgver() {
