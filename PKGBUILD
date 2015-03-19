@@ -47,7 +47,7 @@ MAKE_CONFIG=odroidc_defconfig
 # script will throw an error, but will still continue on, and create an unusable
 # image, keep that in mind.
 PACKAGES_ARM="abootimg cgpt fake-hwclock ntpdate vboot-utils vboot-kernel-utils uboot-mkimage"
-PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils nfs-common lsb-release ntfs-3g usbmount hdparm"
+PACKAGES_BASE="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils nfs-common lsb-release ntfs-3g usbmount hdparm tmux"
 PACKAGES_DESKTOP="xfce4 network-manager network-manager-gnome xserver-xorg-video-fbdev"
 PACKAGES_TOOLS="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool"
 PACKAGES_SERVICES="openssh-server apache2"
@@ -103,6 +103,7 @@ source=(
         "odroid-utility-git::git+https://github.com/mdrjr/odroid-utility.git"
         "debian-systemstart.sh"
         "debian-zram.sh"
+        "bash.bashrc.template"
         )
 
 md5sums=(
@@ -118,8 +119,9 @@ md5sums=(
          '5dc37b921aef0877a1b32f741c27571b' # boot.ini.template
          'bb60369d23ba492e41524c9338f678c1' # sd_fusing.sh
          'SKIP' # odroid-utility-git
-         '664c0e6d1c31555cb16440cc5d0ed8c1' # debian-systemstart.sh
+         'f488b18bc2ab3bfda4efda2b8f5f773b' # debian-systemstart.sh
          '3793439a6f13115f2251e782646ee8e6' # debian-zram.sh
+         '669e17ce329f97c88f49d55a57d9546f' # bash.bashrc.template
          )
 sha1sums=(
          'SKIP' # kali-arm-build-scripts-git
@@ -134,8 +136,9 @@ sha1sums=(
          '2cba8b991d841f773123debc9a4ab43b7a422f04' # boot.ini.template
          '79af8ab465eeb371e83b0b3670869f087040080b' # sd_fusing.sh
          'SKIP' # odroid-utility-git
-         '7329163a03497e25fc63556ecdbd3d28cbd28371' # debian-systemstart.sh
+         '37f7c678e300b433aa2f0319f63065784dd056da' # debian-systemstart.sh
          'ab5a6304d3e3ca5b315cff0bfa25558e38520100' # debian-zram.sh
+         'db80fedf2e3a102d3d6deca56afd529c04bf938d' # bash.bashrc.template
          )
 
 pkgver() {
@@ -280,8 +283,8 @@ kali_rootfs_debootstrap() {
     fi
 
     echo "[DBG] debootstrap state 2.5"
-    sudo rm "${DN_ROOTFS_DEBIAN}/etc/hostname"
-    sudo rm ${DN_ROOTFS_DEBIAN}/etc/ssh/ssh_host_*
+    sudo rm -f "${DN_ROOTFS_DEBIAN}/etc/hostname"
+    sudo rm -f ${DN_ROOTFS_DEBIAN}/etc/ssh/ssh_host_*
 
     # Create sources.list
     cat << EOF > "${PREFIX_TMP}-aptlst1"
@@ -297,8 +300,7 @@ EOF
     fi
 
     # Set hostname
-
-    echo "echo kali > '${DN_ROOTFS_DEBIAN}/etc/hostname'" | sudo sh
+    #echo "echo kali > '${DN_ROOTFS_DEBIAN}/etc/hostname'" | sudo sh
 
     # So X doesn't complain, we add kali to hosts
     cat << EOF > "${PREFIX_TMP}-host"
@@ -1057,11 +1059,18 @@ prepare_hardkernel_rootfs () {
 if [ 1 = 1 ]; then # for debug
     echo "echo 'T0:123:respawn:/sbin/getty -L ttyS0 115200 vt100' >> ${DN_ROOTFS_DEBIAN}/etc/inittab" | sudo sh
 else
+    # Ubuntu
     sudo mkdir -p "${DN_ROOTFS_DEBIAN}/etc/init/"
     T="${PREFIX_TMP}-ttyS0.conf"
     cat << EOF > "${T}"
+# ttyS0 - getty
+#
+# This service maintains a getty on ttyS0 from the point the system is
+# started until it is shut down again.
+
 start on stopped rc or RUNLEVEL=[12345]
 stop on runlevel [!12345]
+
 respawn
 exec /sbin/getty -L 115200 ttyS0 vt102
 EOF
@@ -1193,6 +1202,39 @@ EOF
     sed -i -e "/^[^#]*exit 0/i\echo 0 > /sys/devices/platform/mesonfb/graphics/fb1/blank" tmp
     chmod 755 tmp
     sudo mv tmp ${DN_ROOTFS_DEBIAN}/etc/rc.local
+
+    # http://www.armadeus.com/wiki/index.php?title=FrameBuffer
+    # change the cursor color
+    #PROMPT_COMMAND='echo -e "\033[?16;0;200c"'
+    # blinking
+    #echo 1 > /sys/class/graphics/fbcon/cursor_blink
+
+    # Set tmux to show the cursor
+    T="${PREFIX_TMP}-tmux.conf"
+    if [ -f "${DN_ROOTFS_DEBIAN}/etc/tmux.conf" ]; then
+        cp "${DN_ROOTFS_DEBIAN}/etc/tmux.conf" "${T}"
+    fi
+    cat << EOF >> "${T}"
+setw -ga terminal-overrides ',*:Cc=\E[?120;%p1%s;240c:Cr=\E[?120;0;240c:civis=\E[?25l:cnorm=\E[?25h:cvvis=\E[?25h,'
+set -g status-bg black
+set -g status-fg white
+EOF
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/tmux.conf"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
+
+    T="${PREFIX_TMP}-bashrc"
+    if [ -f "${DN_ROOTFS_DEBIAN}/etc/bash.bashrc" ]; then
+        cp "${DN_ROOTFS_DEBIAN}/etc/bash.bashrc" "${T}"
+    fi
+    cat "${srcdir}/bash.bashrc.template" >> "${T}"
+    sudo mv "${T}" "${DN_ROOTFS_DEBIAN}/etc/bash.bashrc"
+    if [ ! "$?" = "0" ]; then
+        echo "Error in move file $T"
+        exit 1
+    fi
 
 if [ 0 = 1 ]; then
     # TO be verified ....

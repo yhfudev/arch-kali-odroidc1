@@ -38,9 +38,12 @@ systemstart_check_create_sshca() {
 }
 
 case "$1" in
-    start)
+start)
+    # odroid c1
     log_action_begin_msg "Enable console output over HDMI"
     echo "0" > /sys/devices/platform/mesonfb/graphics/fb1/blank
+    # ** Overclock to 1.728 GHz
+    #echo 1728000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
 
     systemstart_check_create_sshca
     systemstart_check_create_hostname
@@ -48,8 +51,9 @@ case "$1" in
     log_action_end_msg 0
     ;;
 
-    *)
+*)
     echo "Usage: /etc/init.d/$0 start"
     exit 1
+    ;;
 
 esac
