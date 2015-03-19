@@ -823,6 +823,7 @@ fi
             bmaptool create -o ${FN_IMAGE}.bmap ${FN_IMAGE}
         fi
     fi
+    FLG_COMPRESSED=0
     if [ ! -f "${FN_IMAGE}.xz" ]; then
         if which pixz; then
             # Don't pixz on 32bit, there isn't enough memory to compress the images.
@@ -834,8 +835,16 @@ fi
                     rm -f ${FN_IMAGE}
                     echo "Generating sha1sum for ${FN_IMAGE}.xz"
                     (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
+                    FLG_COMPRESSED=1
                 fi
             fi
+        fi
+    fi
+    if [ "${FLG_COMPRESSED}" = "0" ]; then
+        gzip -9 -k ${FN_IMAGE}
+        if [ "$?" = "0" ]; then
+            (cd $(dirname ${FN_IMAGE}.gz) && sha1sum $(basename ${FN_IMAGE}.gz) > ${FN_IMAGE}.gz.sha1sum)
+            FLG_COMPRESSED=1
         fi
     fi
 
