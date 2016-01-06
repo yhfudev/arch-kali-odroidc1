@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Maintainer: Yunhui Fu <yhfudev at gmail dot com>
 
 pkgname=kali-odroidc1-image
@@ -76,8 +77,9 @@ DISKLABEL_BOOTFS=BOOTFS
 
 DNSRC_UBOOT_HARDKERNEL=uboot-hardkernel-git
 GITCOMMIT_UBOOT_HARDKERNEL=f631c80969b33b796d2d4c077428b4765393ed2b
-
+ 
 GITCOMMIT_LINUX=c193f5d80656ce6d471cf3a28fe8259b3e3a02c0
+#GITCOMMIT_LINUX=98b7d2c2c9da3d43d42adce240edef98c3c50a43
 GITCOMMIT_UBOOT=${GITCOMMIT_UBOOT_HARDKERNEL}
 DNSRC_LINUX=linux-${GITCOMMIT_LINUX}
 DNSRC_UBOOT=u-boot-${GITCOMMIT_UBOOT}
@@ -108,13 +110,13 @@ source=(
 
 md5sums=(
          'SKIP' # kali-arm-build-scripts-git
-         '705e5f7f79449762628bed07cfa64429' # linux
+         'SKIP' # linux
          'd7805745171f63c2556083e20abbd8eb' # gcc for kernel
          'SKIP' # firmware-linux-git
          'e54725fa965b4b8531563f40a420a40c' # odroidc1-3.10.config
          '3006f3b72f678f2a1ea707b16e0cc8f5' # odroidc1-kernel-config.patch
          '7e52e713f85591ee8b1cf43474da4425' # kali-wifi-injection-chan.c.patch
-         'b55a420b3fad08ef6793eb9eb0990725' # u-boot
+         'SKIP' # u-boot
          '12d6e8a0cbd2d8e130cc8f55389a95c3' # gcc for uboot
          '5dc37b921aef0877a1b32f741c27571b' # boot.ini.template
          'bb60369d23ba492e41524c9338f678c1' # sd_fusing.sh
@@ -125,13 +127,13 @@ md5sums=(
          )
 sha1sums=(
          'SKIP' # kali-arm-build-scripts-git
-         '52834ca196ba0c82b8fb4e40aa4ea21ebaeafcb4' # linux
+         'SKIP' # linux
          'b6d5f985ac254b1d60d8f01459f64d248adb7838' # gcc for kernel
          'SKIP' # firmware-linux-git
          '95cb733d04afb2960beb7c4f5090ca47b943c8d0' # odroidc1-3.10.config
          '26b87b084b894934851af9560af600c628b115ac' # odroidc1-kernel-config.patch
          '84538b4eed140aa186e9fa9af38db08f07c0af14' # kali-wifi-injection-chan.c.patch
-         'b517fca84dd8791e2737ed5439d09c415ebb8e7e' # u-boot
+         'SKIP' # u-boot
          '8069f484cfd5a7ea02d5bb74b56ae6c99e478d13' # gcc for uboot
          '2cba8b991d841f773123debc9a4ab43b7a422f04' # boot.ini.template
          '79af8ab465eeb371e83b0b3670869f087040080b' # sd_fusing.sh
@@ -231,11 +233,11 @@ kali_rootfs_debootstrap() {
     # build kali rootfs
     cd "$srcdir"
 
-    if [ ! -f /usr/share/debootstrap/scripts/kali ]; then
-        sudo ln -s /usr/share/debootstrap/scripts/sid /usr/share/debootstrap/scripts/kali
+    if [ ! -f /usr/share/debootstrap/scripts/kali-current ]; then
+        sudo ln -s /usr/share/debootstrap/scripts/sid /usr/share/debootstrap/scripts/kali-current
     fi
-    if [ ! -f /usr/share/debootstrap/scripts/kali ]; then
-        echo "Error: no deebootstrap for kali"
+    if [ ! -f /usr/share/debootstrap/scripts/kali-current ]; then
+        echo "Error: no debootstrap for kali"
         exit 1
     fi
 
@@ -248,18 +250,18 @@ kali_rootfs_debootstrap() {
     sudo mount -o bind "${DN_APT_CACHE}" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives-real/"
     aptcache_link2srcdst "../archives-real/" "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives"
 
-    echo "[DBG] debootstrap state 1"
+    echo "[DBG] debootstrap stage 1"
     if [ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1" ]; then
-        echo "[DBG] SKIP debootstrap state 1"
+        echo "[DBG] SKIP debootstrap stage 1"
 
     else
         # create the rootfs - not much to modify here, except maybe the hostname.
-        echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
-        sudo debootstrap --foreign --no-check-gpg --include=ca-certificates,ssh,vim,locales,ntpdate,initramfs-tools --arch ${MACHINEARCH} kali "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
+        echo "[DBG] debootstrap --foreign --arch ${MACHINEARCH} kali-current '${DN_ROOTFS_DEBIAN}'  http://${INSTALL_MIRROR}/kali"
+        sudo debootstrap --foreign --no-check-gpg --include=ca-certificates,ssh,vim,locales,ntpdate,initramfs-tools --arch ${MACHINEARCH} kali-current "${DN_ROOTFS_DEBIAN}" "http://${INSTALL_MIRROR}/kali"
         if [ "$?" = "0" ]; then
             touch "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE1"
         else
-            echo "Error in debootstarap stage 1"
+            echo "Error in debootstrap stage 1"
             exit 1
         fi
     fi
@@ -268,9 +270,9 @@ kali_rootfs_debootstrap() {
         sudo cp `which qemu-arm-static` "${DN_ROOTFS_DEBIAN}/usr/bin/"
     fi
 
-    echo "[DBG] debootstrap state 2"
+    echo "[DBG] debootstrap stage 2"
     if [ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE2" ]; then
-        echo "[DBG] SKIP debootstrap state 2"
+        echo "[DBG] SKIP debootstrap stage 2"
 
     else
         sudo chroot "${DN_ROOTFS_DEBIAN}" /usr/bin/env -i LANG=C /debootstrap/debootstrap --second-stage
@@ -282,14 +284,14 @@ kali_rootfs_debootstrap() {
         fi
     fi
 
-    echo "[DBG] debootstrap state 2.5"
+    echo "[DBG] debootstrap stage 2.5"
     sudo rm -f "${DN_ROOTFS_DEBIAN}/etc/hostname"
     sudo rm -f ${DN_ROOTFS_DEBIAN}/etc/ssh/ssh_host_*
 
     # Create sources.list
     cat << EOF > "${PREFIX_TMP}-aptlst1"
-deb http://${INSTALL_MIRROR}/kali kali main contrib non-free
-deb http://${INSTALL_SECURITY}/kali-security kali/updates main contrib non-free
+deb http://${INSTALL_MIRROR}/kali kali-current main contrib non-free
+deb http://${INSTALL_SECURITY}/kali-security kali-current/updates main contrib non-free
 EOF
     chmod 644 "${PREFIX_TMP}-aptlst1"
     sudo chown root:root "${PREFIX_TMP}-aptlst1"
@@ -381,9 +383,9 @@ EOF
     # Stop the boot-sequence whinging about /tmp being read-only before /tmp is mounted:
     touch "${DN_ROOTFS_DEBIAN}/tmp/.tmpfs"
 
-    echo "[DBG] debootstrap state 3"
+    echo "[DBG] debootstrap stage 3"
     if [ -f "${PREFIX_TMP}-FLG_KALI_ROOTFS_STAGE3" ]; then
-        echo "[DBG] SKIP debootstrap state 3"
+        echo "[DBG] SKIP debootstrap stage 3"
 
     else
         #sudo mkdir -p "${DN_ROOTFS_DEBIAN}/sys"
@@ -489,11 +491,11 @@ EOF
         find "${DN_ROOTFS_DEBIAN}/var/cache/apt/archives/" | while read i ; do sudo rm -rf $i; done
 
         cat << EOF > "${PREFIX_TMP}-aptlst"
-deb http://http.kali.org/kali kali main non-free contrib
-deb http://security.kali.org/kali-security kali/updates main contrib non-free
+deb http://http.kali.org/kali kali-current main non-free contrib
+deb http://security.kali.org/kali-security kali-current/updates main contrib non-free
 
-deb-src http://http.kali.org/kali kali main non-free contrib
-deb-src http://security.kali.org/kali-security kali/updates main contrib non-free
+deb-src http://http.kali.org/kali kali-current main non-free contrib
+deb-src http://security.kali.org/kali-security kali-current/updates main contrib non-free
 EOF
         chmod 644 "${PREFIX_TMP}-aptlst"
         sudo chown root:root "${PREFIX_TMP}-aptlst"
@@ -721,6 +723,9 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
     bootp="/dev/mapper/${LOOPNAME}p1"
     rootp="/dev/mapper/${LOOPNAME}p2"
 
+    echo "waits for 8 seconds for $rootp to be accessible ..."
+    sleep 8
+
     if [ -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" ]; then
         echo "[DBG] SKIP rsync rootfs"
 
@@ -740,7 +745,7 @@ if [[ ! -f "${PREFIX_TMP}-FLG_FORMAT_IMAGE" || ! -f "${PREFIX_TMP}-FLG_RSYNC_ROO
         fi
 
         # enable writeback. this step should do before you use data=writeback in the fstab!
-        tune2fs -o journal_data_writeback
+        tune2fs -o journal_data_writeback $rootp
 
         #dumpe2fs $rootp
         touch "${PREFIX_TMP}-FLG_FORMAT_IMAGE"
@@ -836,6 +841,8 @@ fi
                     echo "Generating sha1sum for ${FN_IMAGE}.xz"
                     (cd $(dirname ${FN_IMAGE}.xz) && sha1sum $(basename ${FN_IMAGE}.xz) > ${FN_IMAGE}.xz.sha1sum)
                     FLG_COMPRESSED=1
+                else
+                    rm -f ${FN_IMAGE}.xz
                 fi
             fi
         fi
@@ -845,6 +852,8 @@ fi
         if [ "$?" = "0" ]; then
             (cd $(dirname ${FN_IMAGE}.gz) && sha1sum $(basename ${FN_IMAGE}.gz) > ${FN_IMAGE}.gz.sha1sum)
             FLG_COMPRESSED=1
+        else
+            rm -f ${FN_IMAGE}.gz
         fi
     fi
 
@@ -1159,7 +1168,7 @@ EOF
     fi
 
     # x window
-    mkdir -p ${DN_ROOTFS_DEBIAN}/etc/X11/
+    sudo mkdir -p ${DN_ROOTFS_DEBIAN}/etc/X11/
     sudo mv ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf ${DN_ROOTFS_DEBIAN}/etc/X11/xorg.conf.old
     T="${PREFIX_TMP}-xorg.conf"
     cat << EOF > "${T}"
